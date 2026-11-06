@@ -1,0 +1,374 @@
+import SwiftUI
+
+/// The animated rig of a stage (`figureStage` / `peekingFigure`): one figure
+/// on a strip as wide as its current anchor, above the anchor's top edge.
+/// Drawn in `FigureSkeleton.peekBox`, clipped at the anchor's edge (grid y
+/// `FigureSkeleton.edgeY`), so whatever is "behind the card" never shows — also over
+/// transparent (dashed) cards.
+///
+/// Free of app styling: colour, idle-motion policy and the tap feedback come
+/// in from the stage.
+struct PeekingFigureView: View {
+    /// Marked views in the stage's space, in layout order.
+    let anchors: [FigureAnchorFrame]
+    /// Visible area in the stage's space; nil = unbounded (a single card).
+    let viewport: CGRect?
+    var isScrolling = false
+    var style = FigureStyle.standard
+    var isWaiting = false
+    var loops = false
+    var color: Color
+    /// Sizes at the stage's figure height.
+    var metrics = PeekingFigureMetrics.standard
+    /// Idle motion allowed (foreground, not Low Power) — gates the loop.
+    var idleMotionEnabled = true
+    var onTap: () -> Void = {}
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Hidden behind the card until the first play starts.
+    @State private var timeline = FigureTimeline(action: .rest, entrance: .climb, reduceMotion: false)
+    @State private var startDate: Date?
+    @State private var hasPlayed = false
+    /// A play is owed: it waits for a celebration to end.
+    @State private var isPending = false
+    @State private var playID = 0
+    /// Behind the card (before the first entrance, after a looped cycle or
+    /// when its anchor went away); the next play comes out again.
+    @State private var isHidden = true
+    /// Hidden with nowhere to come out right now (a scroll in progress or no
+    /// anchor fully on screen) — a scroll stop or new anchors resume it.
+    @State private var isParked = false
+    /// The pose holds still — the animation clock stops (`stillWindows`).
+    @State private var isStill = false
+    /// The anchor it stands on (`anchorID`) and the one it stood on until it
+    /// ducked mid-relocation (`previousAnchorID`).
+    @State private var anchorID: AnyHashable?
+    @State private var previousAnchorID: AnyHashable?
+    /// The last action drawn — the next one differs.
+    @State private var lastAction: FigureAction?
+    /// Spots along the edge (`FigurePlacement`) for the current play: where
+    /// it stood (`previousSpot`, until hidden mid-relocation), where it pops
+    /// up (`spot`) and where a walk ends (`walkTarget`).
+    @State private var spot = 1.0
+    @State private var previousSpot = 1.0
+    @State private var walkTarget = 1.0
+    /// The anchor's edge it is at (`edge`) and the one it was at until it
+    /// ducked mid-relocation (`previousEdge`).
+    @State private var edge = FigureEdge.top
+    @State private var previousEdge = FigureEdge.top
+
+    var body: some View {
+        TimelineView(.animation(paused: startDate == nil || isStill || !isOnScreen)) { context in
+            let elapsed = elapsed(at: context.date)
+            let place = position(at: elapsed)
+            if let rect = place.anchor.flatMap(rect(for:)) {
+                let pose = joints(at: elapsed, edge: place.edge)
+                let frame = figureFrame(at: place.edge, spot: place.spot, on: rect)
+                FigureCanvas(joints: pose, color: color, viewBox: PeekingFigureMetrics.box(for: place.edge))
+                    .opacity(timeline.opacity(at: elapsed))
+                    .frame(width: frame.width, height: frame.height)
+                    .clipped()
+                    // Sides are drawn at the trailing edge; leading mirrors it.
+                    .scaleEffect(x: place.edge == .leading ? -1 : 1, y: 1)
+                    .contentShape(.rect)
+                    .onTapGesture { tapped() }
+                    // Only the figure itself takes taps, and only once it is
+                    // out — never the content it covers.
+                    .allowsHitTesting(Self.isOut(pose, at: place.edge))
+                    .position(x: frame.midX, y: frame.midY)
+            }
+        }
+        .accessibilityHidden(true)
+        .onAppear { appear() }
+        .onDisappear {
+            // The next appearance climbs in again.
+            startDate = nil
+            hasPlayed = false
+            isPending = false
+            isHidden = true
+            isParked = false
+            isStill = false
+            anchorID = nil
+            previousAnchorID = nil
+        }
+        .onChange(of: isWaiting) { _, waiting in
+            if !waiting, isPending {
+                isPending = false
+                resume()
+            }
+        }
+        .onChange(of: isScrolling) { _, scrolling in
+            if !scrolling, isParked, !isWaiting { comeOut() }
+        }
+        .onChange(of: anchors.map(\.id)) { _, ids in
+            if let anchorID, !ids.contains(anchorID) {
+                // Its card went away (another segment, out of a lazy stack):
+                // start over from behind another one.
+                startDate = nil
+                isStill = false
+                isHidden = true
+                self.anchorID = nil
+                previousAnchorID = nil
+                playID += 1
+                if isWaiting { isPending = true } else { comeOut() }
+            } else if isParked, !isWaiting {
+                comeOut()
+            }
+        }
+        .onChange(of: viewport) {
+            // Laid out for real (the first pass can be empty), or resized.
+            if isParked, !isWaiting { comeOut() }
+        }
+        .onChange(of: idleMotionEnabled) { _, enabled in
+            // Idle motion back on (foreground, Low Power off): pick the loop up.
+            if enabled, canLoop, hasPlayed, startDate == nil, !isWaiting { resume() }
+        }
+        .task(id: playID) {
+            guard let start = startDate else { return }
+            let played = timeline
+            // Stop the clock while the pose holds still.
+            for window in played.stillWindows {
+                guard await sleep(until: start + window.lowerBound) else { return }
+                isStill = true
+                guard await sleep(until: start + window.upperBound) else { return }
+                isStill = false
+            }
+            guard await sleep(until: start + played.duration) else { return }
+            startDate = nil
+            guard let pause = played.hiddenPause else { return }
+            // Looped cycle: behind the card now — wait, then come out elsewhere.
+            isHidden = true
+            try? await Task.sleep(for: .seconds(pause))
+            guard !Task.isCancelled else { return }
+            if isWaiting {
+                isPending = true
+            } else if canLoop {
+                comeOut()
+            } else {
+                // Idle motion went off mid-cycle: come back and stay standing.
+                comeOut(action: .rest)
+            }
+        }
+    }
+
+    /// Sleeps until `date`; false when cancelled.
+    private func sleep(until date: Date) async -> Bool {
+        let seconds = date.timeIntervalSinceNow
+        if seconds > 0 { try? await Task.sleep(for: .seconds(seconds)) }
+        return !Task.isCancelled
+    }
+
+    /// Looping is on and allowed right now.
+    private var canLoop: Bool {
+        loops && idleMotionEnabled && !reduceMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled
+    }
+
+    /// The figure is out from behind its card (or edge) far enough to tap.
+    private static func isOut(_ pose: FigureJoints, at edge: FigureEdge) -> Bool {
+        switch edge {
+        case .top: pose.y < 40
+        case .bottom: pose.y > -40
+        case .leading, .trailing: pose.x < 72
+        }
+    }
+
+    private func rect(for id: AnyHashable) -> CGRect? {
+        anchors.first { $0.id == id }?.rect
+    }
+
+    /// The figure's box in the stage's space at `edge` of `rect`, `spot`
+    /// along that edge: above the top, under the bottom, over the side's
+    /// edge of the card (its outer side on the card's edge).
+    private func figureFrame(at edge: FigureEdge, spot: Double, on rect: CGRect) -> CGRect {
+        let size = metrics.size(for: edge)
+        switch edge {
+        case .top, .bottom:
+            let inset = FigurePlacement.trailingInset(
+                fraction: spot, cardWidth: rect.width,
+                figureWidth: size.width, margin: metrics.edgeMargin
+            )
+            let y = edge == .top ? rect.minY - size.height : rect.maxY
+            return CGRect(x: rect.maxX - inset - size.width, y: y, width: size.width, height: size.height)
+        case .leading, .trailing:
+            let top = FigurePlacement.sideTop(
+                fraction: spot, track: rect.minY...rect.maxY,
+                boxHeight: size.height, margin: metrics.sideMargin
+            )
+            let x = edge == .trailing ? rect.maxX - size.width : rect.minX
+            return CGRect(x: x, y: top, width: size.width, height: size.height)
+        }
+    }
+
+    /// Spots along a side whose box is on screen right now (the card may
+    /// reach past the viewport); the whole edge for top and bottom.
+    private func spotRange(at edge: FigureEdge, on rect: CGRect) -> ClosedRange<Double> {
+        guard edge.isSide, let viewport else { return 0...1 }
+        let height = metrics.size(for: edge).height
+        let margin = metrics.sideMargin
+        let free = rect.height - 2 * margin - height
+        guard free > 0 else { return 0...1 }
+        let track = FigureAnchorPicker.sideTrack(rect: rect, viewport: viewport)
+        let low = (track.lowerBound - rect.minY) / free
+        let high = (track.upperBound - margin - height - margin - rect.minY) / free
+        let lower = min(max(Double(low), 0), 1)
+        return lower...max(lower, min(max(Double(high), 0), 1))
+    }
+
+    /// Some of the figure's box is in the visible area — else the clock stops.
+    private var isOnScreen: Bool {
+        guard let viewport else { return true }
+        return [(anchorID, edge, spot), (previousAnchorID, previousEdge, previousSpot)]
+            .compactMap { id, edge, spot in id.flatMap(rect(for:)).map { figureFrame(at: edge, spot: spot, on: $0) } }
+            .contains { $0.intersects(viewport) }
+    }
+
+    private func elapsed(at date: Date) -> Double {
+        startDate.map { date.timeIntervalSince($0) } ?? (hasPlayed ? .infinity : 0)
+    }
+
+    /// Anchor, edge and spot shown at `elapsed`: the old ones until hidden
+    /// mid-relocation, then the new ones, gliding to `walkTarget` while
+    /// walking or climbing.
+    private func position(at elapsed: Double) -> (anchor: AnyHashable?, edge: FigureEdge, spot: Double) {
+        if let jump = timeline.relocatesAt, elapsed < jump { return (previousAnchorID, previousEdge, previousSpot) }
+        if let progress = timeline.walkProgress(at: elapsed) {
+            return (anchorID, edge, spot + (walkTarget - spot) * progress)
+        }
+        return (anchorID, edge, spot)
+    }
+
+    /// The pose; on the top it leans a little into the walk, and a run to
+    /// the left is mirrored (the turn blends with `profile`).
+    private func joints(at elapsed: Double, edge: FigureEdge) -> FigureJoints {
+        var joints = timeline.joints(at: elapsed)
+        guard edge == .top else { return joints }
+        if let progress = timeline.walkProgress(at: elapsed), walkTarget != spot, joints.profile == 0 {
+            // Fraction grows to the right; lean + = right.
+            joints.lean += (walkTarget > spot ? 5 : -5) * sin(progress * .pi)
+        }
+        if walkTarget < spot {
+            joints.facing = 1 - 2 * joints.profile
+        }
+        return joints
+    }
+
+    /// Edges it may use now: all of them while it loops, else only the top
+    /// (one entrance and standing).
+    private var allowedEdges: FigureEdges { canLoop ? .all : .top }
+
+    /// A random anchor and edge fully on screen, on another anchor than
+    /// `current` when there is one; nil = none.
+    private func pick(excluding current: AnyHashable?) -> (id: AnyHashable, edge: FigureEdge)? {
+        var generator = SystemRandomNumberGenerator()
+        return FigureAnchorPicker.nextPlacement(
+            current: current,
+            candidates: anchors.map { (id: $0.id, rect: $0.rect, edges: $0.edges) },
+            viewport: viewport,
+            sizes: metrics.sizes,
+            allowed: allowedEdges,
+            using: &generator
+        )
+    }
+
+    /// Duck behind the card, come out elsewhere (maybe on another card or
+    /// edge), play a new action.
+    private func tapped() {
+        guard !reduceMotion, !isWaiting else { return }
+        onTap()
+        play(entrance: style.entrance, relocating: true)
+    }
+
+    private func appear() {
+        startDate = nil
+        hasPlayed = false
+        isHidden = true
+        anchorID = nil
+        previousAnchorID = nil
+        if isWaiting {
+            // Come out and rest; the cycle carries on after the celebration.
+            comeOut(action: .rest)
+            isPending = true
+        } else {
+            comeOut()
+        }
+    }
+
+    /// Carry on after a celebration or with idle motion back on.
+    private func resume() {
+        if isHidden { comeOut() } else { play(entrance: nil) }
+    }
+
+    /// From behind the cards: out from behind a visible anchor — or wait
+    /// (`isParked`) while scrolling or when none is fully on screen.
+    private func comeOut(action override: FigureAction? = nil) {
+        // Already out (two triggers in one update): nothing to do.
+        guard isHidden else { return }
+        guard !isScrolling || !hasPlayed, pick(excluding: anchorID) != nil else {
+            isParked = true
+            return
+        }
+        isParked = false
+        play(entrance: style.entrance, action: override)
+    }
+
+    private func play(entrance: FigureEntrance?, action override: FigureAction? = nil, relocating: Bool = false) {
+        var generator = SystemRandomNumberGenerator()
+        // Start from wherever the figure is right now (mid-walk included).
+        let current = position(at: elapsed(at: .now))
+        previousSpot = current.spot
+        previousAnchorID = current.anchor
+        previousEdge = current.edge
+        // Out of sight (ducking, or hidden behind the cards): pop up elsewhere.
+        let popsUp = relocating || isHidden
+        if popsUp {
+            let next = pick(excluding: current.anchor)
+            anchorID = next?.id ?? current.anchor
+            edge = next?.edge ?? (allowedEdges.contains(current.edge.member) ? current.edge : .top)
+        }
+        // Low Power Mode: no action, only the rest pose (and its entrance).
+        let played: FigureAction
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            played = .rest
+        } else if let override {
+            played = override
+        } else {
+            played = FigureRepertoire.next(after: lastAction, from: FigureRepertoire.actions(for: edge), using: &generator)
+            lastAction = played
+        }
+        let variation = canLoop && override == nil
+            ? FigureVariation.random(for: played, exit: style.entrance, using: &generator)
+            : .standard
+        timeline = FigureTimeline(
+            action: played, entrance: entrance, reduceMotion: reduceMotion, edge: edge,
+            relocating: relocating, from: current.edge, tempo: style.tempo, variation: variation
+        )
+        let range = anchorID.flatMap(rect(for:)).map { spotRange(at: edge, on: $0) } ?? 0...1
+        if popsUp {
+            if played == .climb {
+                // Low on the side, so the climb goes up.
+                spot = Double.random(in: (range.lowerBound + (range.upperBound - range.lowerBound) * 0.55)...range.upperBound, using: &generator)
+            } else if anchorID == current.anchor, edge == current.edge {
+                spot = FigurePlacement.next(from: current.spot, using: &generator)
+            } else {
+                spot = Double.random(in: range, using: &generator)
+            }
+        } else {
+            spot = current.spot
+        }
+        spot = min(max(spot, range.lowerBound), range.upperBound)
+        isHidden = false
+        isStill = false
+        if timeline.walkWindow == nil {
+            walkTarget = spot
+        } else if played == .climb {
+            walkTarget = Double.random(in: range.lowerBound...max(range.lowerBound, spot - 0.35), using: &generator)
+        } else {
+            walkTarget = FigurePlacement.next(from: spot, using: &generator)
+        }
+        hasPlayed = true
+        startDate = .now
+        playID += 1
+    }
+}
+
