@@ -14,7 +14,8 @@ somewhere else:
 - **leading / trailing edge** — slides out from behind the card and plays
   beside it, outside its edge, holding on: hangs out and looks around, does a
   human flag (hands wide apart on the edge, body held out flat), climbs up the
-  edge hand over hand (it comes out hands first, already facing the card) (only where enough of the side is on screen). Nothing
+  edge hand over hand (the flag and the climb come out hands first, straight
+  into the action) (only where enough of the side is on screen). Nothing
   plays over the card. A side less than ~28 pt from the screen's edge (a
   full-width card, the outer side of a tile) has no room beside it and only
   climbs there — the figure may be cut by the screen's edge; a side facing
@@ -132,7 +133,7 @@ there is another), then an edge of it, evenly:
 
 Weights are renormalized over the edges that are possible right now. Some
 actions need more room: the climb needs ~136 pt of the side on screen (it
-climbs at least ~54 pt), the worm walk ~33 pt of free width on one side of
+climbs at least ~54 pt, always to the top of the visible side), the worm walk ~33 pt of free width on one side of
 it; elsewhere the edge simply plays its other actions. Sizes scale with
 `figureHeight(_:)`.
 

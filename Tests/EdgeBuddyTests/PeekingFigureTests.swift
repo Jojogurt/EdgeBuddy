@@ -1166,5 +1166,61 @@ struct PeekingFigureTests {
         )
         #expect(abs(try #require(peek.relocatesAt) - FigureTimeline.duckDuration) < 1e-9)
     }
+
+    // MARK: - Flag entrance and exit
+
+    @Test("Flag entrance: from behind the card, upper hand, lower hand, swing out flat — no peek, no turn")
+    func flagEntrance() throws {
+        var variation = FigureVariation(repeats: 2)
+        variation.exit = .climb
+        variation.hiddenPause = 1
+        let flag = FigureTimeline(action: .flag, entrance: .climb, reduceMotion: false, edge: .trailing, variation: variation)
+        let poses = FigureEdgePoses.self
+        #expect(flag.keyframes[0].joints == poses.flagHidden)
+        #expect(flag.final == poses.flagHidden)
+        #expect(extent(poses.flagHidden).maxX < poses.sideMaskX)
+        let entered = poses.flagEntranceSteps.map(\.duration).reduce(0, +)
+        #expect(flag.keyframes.contains { abs($0.time - entered) < 1e-9 && $0.joints == poses.flagA })
+        #expect(!flag.keyframes.contains { $0.joints == poses.peek })
+        // The upper hand grips first (the lower one still behind the card), then the lower.
+        let high = FigureSkeleton(poses.flagReachHigh)
+        #expect(distance(high.armR[2], poses.flagGripTop) < 1e-6)
+        #expect(high.armL[2].x < poses.sideMaskX)
+        let low = FigureSkeleton(poses.flagReachLow)
+        #expect(distance(low.armL[2], poses.flagGripBottom) < 1e-6)
+        #expect(distance(low.armR[2], poses.flagGripTop) < 1e-6)
+        // Exit: the lower hand lets go before the upper one.
+        let exit = poses.flagRoute.exit
+        #expect(exit.map(\.joints) == [poses.flagSwing, poses.flagReachLow, poses.flagReachHigh, poses.flagHidden])
+        // Gripping hands hold from the moment they grip.
+        for time in samples(flag) {
+            guard let (a, b) = segment(flag, at: time) else { continue }
+            let s = FigureSkeleton(flag.joints(at: time))
+            for limb in FigureLimb.allCases where b.limbs[limb] == .held {
+                let start = FigureSkeleton(a.joints).end(of: limb)
+                guard distance(start, FigureSkeleton(b.joints).end(of: limb)) < 0.6 else { continue }
+                #expect(distance(s.end(of: limb), start) < 0.6, "\(limb) at \(time)")
+            }
+        }
+        neverSquashed(flag)
+        // Staying out: a smooth way back to the peek, still never squashed.
+        let stays = FigureTimeline(action: .flag, entrance: .climb, reduceMotion: false, edge: .trailing)
+        #expect(stays.keyframes[0].joints == poses.flagHidden)
+        #expect(stays.final == poses.peek)
+        neverSquashed(stays)
+    }
+
+    @Test("A tap mid-flag leaves around the edge, hidden at the jump; the peek still ducks")
+    func flagRelocation() throws {
+        let timeline = FigureTimeline(
+            action: .wave, entrance: .spring, reduceMotion: false, edge: .top,
+            relocating: true, from: .trailing, pose: FigureEdgePoses.flagB
+        )
+        let jump = try #require(timeline.relocatesAt)
+        #expect(timeline.joints(at: 0) == FigureEdgePoses.flagB)
+        #expect(timeline.keyframes.contains { abs($0.time - jump) < 1e-9 && $0.joints == FigureEdgePoses.flagHidden })
+        #expect(FigureEdgePoses.route(leaving: FigureEdgePoses.flagSwing) != nil)
+        #expect(FigureEdgePoses.route(leaving: FigureEdgePoses.peekOut) == nil)
+    }
 }
 

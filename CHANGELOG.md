@@ -13,7 +13,7 @@ change in minor releases.
   card hides whatever is behind it, nothing plays over the card. It slides out
   from behind the edge; the peek hangs out holding the edge; the **flag** is a
   human flag (hands wide apart on the edge, upper arm straight, never
-  crossed); the **climb** faces the card, goes hand over hand and always up,
+  crossed); the **climb** faces the card, goes hand over hand and always up to the top of the visible side,
   and is only played where enough of the side is on screen (~136 pt at the
   default height). A side needs that edge on screen; the figure past it may be
   cut by the screen's edge.
@@ -22,6 +22,10 @@ change in minor releases.
   profile facing the card and the feet find the edge; it leaves the same way
   backwards (body in first, hands let go last), also when tapped mid-climb.
   Turns between the peek and the climb no longer squash the figure flat.
+- The side flag does the same: from behind the card the upper hand grips the
+  edge, then the lower, and the body swings out straight into the flag; it
+  leaves backwards (body in, lower hand, then upper), also when tapped
+  mid-flag.
 - A side less than 28 pt (scaled with the figure's height) from the screen's
   edge only climbs, and is used only where the climb fits; sides facing other
   content keep the full repertoire. Single cards are never at the edge.

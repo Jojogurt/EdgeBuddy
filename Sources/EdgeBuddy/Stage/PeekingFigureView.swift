@@ -396,13 +396,13 @@ struct PeekingFigureView: View {
         let span = rect.map { metrics.travelSpan(at: edge, on: $0) } ?? 0
         if popsUp {
             if played == .climb {
-                // Low on the side, so the climb goes up; a little higher only
-                // when the side has room to spare.
-                let climb = FigureTimeline.travel(.climb, repeats: FigureTimeline.canvasRepeats(.climb)) ?? 0
-                let spare = range.upperBound - FigurePlacement.travelTarget(
-                    from: range.upperBound, distance: max(0, room - climb), direction: -1, scale: metrics.scale, span: span
+                // As many whole cycles as the visible side holds, starting
+                // that far below its top — so the climb always ends at the top.
+                let beat = FigureTimeline.travel(.climb, repeats: 1) ?? 1
+                let cycles = max(1, Int((room + 1e-9) / beat))
+                spot = FigurePlacement.travelTarget(
+                    from: range.lowerBound, distance: Double(cycles) * beat, direction: 1, scale: metrics.scale, span: span
                 )
-                spot = range.upperBound - Double.random(in: 0...(spare / 2), using: &generator)
             } else if anchorID == current.anchor, edge == current.edge {
                 spot = FigurePlacement.next(from: current.spot, using: &generator)
             } else {
@@ -420,7 +420,8 @@ struct PeekingFigureView: View {
         let forward = edge == .top && spot > 0.5 ? -1.0 : 1.0
         if let beat = FigureTimeline.travel(played, repeats: 1) {
             let fromSpot = rect.map { metrics.travelRoom(at: edge, on: $0, viewport: viewport, from: spot) } ?? 0
-            let wanted = variation.repeats ?? FigureTimeline.canvasRepeats(played)
+            // The climb goes all the way up: every cycle that fits.
+            let wanted = played == .climb ? Int.max : variation.repeats ?? FigureTimeline.canvasRepeats(played)
             variation.repeats = max(1, min(wanted, Int((fromSpot + 1e-9) / beat)))
         }
         timeline = FigureTimeline(

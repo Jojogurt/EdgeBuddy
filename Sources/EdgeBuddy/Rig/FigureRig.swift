@@ -463,6 +463,60 @@ enum FigureEdgePoses {
         armL: CGPoint(x: sideGripX, y: climbHandTop), armR: CGPoint(x: sideGripX, y: climbHandTop + climbReach),
         legL: CGPoint(x: climbFootX, y: climbFootBottom), legR: CGPoint(x: climbFootX, y: climbFootBottom - climbReach)
     )
+    /// How a side action that has its own way in and out (the climb, the
+    /// flag) comes out from behind the card and goes back.
+    struct Route: Sendable {
+        /// Behind the card, ready to reach around the edge.
+        let hidden: FigureJoints
+        /// From `hidden` into `held`, hands first.
+        let entrance: [FigureTimeline.Step]
+        /// `entrance` backwards: the body swings in, the hands let go last.
+        let exit: [FigureTimeline.Step]
+        /// The action's own pose, kept while holding before and after it.
+        let held: FigureJoints
+    }
+
+    /// The route of `action` at a side; nil = it comes out through the peek.
+    static func route(for action: FigureAction) -> Route? {
+        switch action {
+        case .climb: climbRoute
+        case .flag: flagRoute
+        default: nil
+        }
+    }
+
+    /// The route to leave by from `pose` mid-action (a tap): the climb's in
+    /// profile, the flag's when the body is held out sideways; nil = duck.
+    static func route(leaving pose: FigureJoints) -> Route? {
+        if pose.profile > 0.5 { return climbRoute }
+        if pose.lean < -30 { return flagRoute }
+        return nil
+    }
+
+    static let climbRoute = Route(hidden: climbHidden, entrance: climbEntranceSteps, exit: climbExitSteps, held: climbA)
+
+    /// Behind the card by its edge, upright, leaning toward it, arms down.
+    static let flagHidden = rest.with {
+        $0.armL = -10; $0.elbowL = -1; $0.armR = 10; $0.elbowR = 1
+        $0.lean = 20; $0.tilt = -20; $0.x = 26; $0.y = 8
+    }
+    /// The upper hand around the edge first, on the flag's upper grip.
+    static let flagReachHigh = flagHidden.placing(armR: flagGripTop)
+    /// Then the lower hand, on the lower grip.
+    static let flagReachLow = flagReachHigh.placing(armL: flagGripBottom)
+    /// The flag's entrance from `flagHidden`: upper hand, lower hand, then
+    /// the body swings out on them into `flagA`, legs trailing.
+    static let flagEntranceSteps: [FigureTimeline.Step] = [
+        .init(duration: 0.24, joints: flagReachHigh, easing: .out),
+        .init(duration: 0.2, joints: flagReachLow, limbs: LimbPaths(armR: .held)),
+        .init(duration: 0.34, joints: flagSwing, limbs: .hands),
+        .init(duration: 0.3, joints: flagA, limbs: .hands),
+    ]
+    static let flagRoute = Route(
+        hidden: flagHidden, entrance: flagEntranceSteps,
+        exit: FigureTimeline.reversed(flagEntranceSteps, from: flagHidden), held: flagA
+    )
+
     /// Where the climb's hands hold the edge in `climbA`.
     static let climbGripLow = CGPoint(x: sideGripX, y: climbHandTop + climbReach)
     static let climbGripHigh = CGPoint(x: sideGripX, y: climbHandTop)
@@ -708,8 +762,8 @@ struct FigureTimeline: Equatable, Sendable {
     ///     (`relocatesAt`) with `entrance` (spring when nil) and play.
     ///   - previousEdge: the edge it ducks from when relocating (default `edge`).
     ///   - previousPose: the pose it ducks from when relocating (default the
-    ///     previous edge's rest); a climbing pose at a side leaves the way the
-    ///     climb does (`FigureEdgePoses.climbExitSteps`).
+    ///     previous edge's rest); mid-climb or mid-flag at a side it leaves
+    ///     the way that action does (`FigureEdgePoses.route(leaving:)`).
     ///   - tempo: playback speed (`FigureStyle.tempo`); every time scales by 1/tempo.
     ///   - variation: holds, repeat count and exit of a looped cycle.
     init(
@@ -749,12 +803,12 @@ struct FigureTimeline: Equatable, Sendable {
         }
 
         let comesOut = relocating ? (entrance ?? .spring) : entrance
-        // A side climb comes out and goes back in its own way: in profile,
-        // facing the card, hands first — no peek, no turn.
-        let climbing = edge.isSide && action == .climb
-        let hidden = comesOut.map { climbing ? poses.climbHidden : Self.hiddenPose($0, edge: edge) } ?? rest
-        // The pose the holds around the action keep.
-        let settled = climbing && (comesOut != nil || variation.exit != nil) ? poses.climbA : rest
+        // The side climb and flag come out and go back their own way, hands
+        // first, straight into (and out of) the action — no peek, no turn.
+        let route = edge.isSide ? poses.route(for: action) : nil
+        let entersOwnWay = route != nil && comesOut != nil
+        let leavesOwnWay = route != nil && variation.exit != nil
+        let hidden = comesOut.map { route?.hidden ?? Self.hiddenPose($0, edge: edge) } ?? rest
         func hold(_ seconds: Double, _ pose: FigureJoints) {
             guard seconds > 0 else { return }
             time += seconds
@@ -764,10 +818,10 @@ struct FigureTimeline: Equatable, Sendable {
             let before = previousEdge ?? edge
             let start = previousPose ?? Self.restPose(before)
             frames.append(Keyframe(time: 0, joints: start, easing: .inOut))
-            if before.isSide, start.profile > 0.5 {
-                // Mid-climb: back around the edge, hands last — quicker than
-                // the climb's own exit.
-                for step in poses.climbExitSteps { at(step.duration * 0.6, step.joints, step.easing, limbs: step.limbs) }
+            if before.isSide, let leaving = poses.route(leaving: start) {
+                // Mid-climb or mid-flag: back around the edge, hands last —
+                // quicker than the action's own exit.
+                for step in leaving.exit { at(step.duration * 0.6, step.joints, step.easing, limbs: step.limbs) }
             } else {
                 at(Self.duckDuration, Self.duckPose(before), .in, limbs: before == .bottom ? FigureEdgePoses.hangGrips : .none)
             }
@@ -780,8 +834,8 @@ struct FigureTimeline: Equatable, Sendable {
             frames.append(Keyframe(time: 0, joints: hidden, easing: .inOut))
             relocatesAt = nil
         }
-        if let comesOut { play(climbing ? poses.climbEntranceSteps : Self.entranceSteps(comesOut, edge: edge)) }
-        hold(variation.holdBefore, comesOut != nil ? settled : rest)
+        if let comesOut { play(route.map { entersOwnWay ? $0.entrance : [] } ?? Self.entranceSteps(comesOut, edge: edge)) }
+        hold(variation.holdBefore, entersOwnWay ? route?.held ?? rest : rest)
 
         switch action {
         case .rest:
@@ -822,27 +876,31 @@ struct FigureTimeline: Equatable, Sendable {
             at(0.24, poses.peekTilt, limbs: Self.peekGrip)
             at(0.3, rest, limbs: Self.peekGrip)
         case .flag:
-            // The near hand slides down the edge to its grip, the other
-            // reaches straight up to the upper one.
-            at(0.4, poses.flagSwing, limbs: .hands)
-            // Both hands hold their grips while the body swings out flat.
-            at(0.35, poses.flagA, limbs: .hands)
+            if !entersOwnWay {
+                // From the peek: the near hand slides down the edge to its
+                // grip, the other reaches up to the upper one; both hold
+                // while the body swings out flat.
+                at(0.4, poses.flagSwing, limbs: .hands)
+                at(0.35, poses.flagA, limbs: .hands)
+            }
             for _ in 0..<repeats {
                 at(0.22, poses.flagB, limbs: .hands)
                 at(0.22, poses.flagA, limbs: .hands)
             }
-            at(0.35, poses.flagSwing, limbs: .hands)
-            at(0.42, rest, limbs: .hands)
+            if !leavesOwnWay {
+                at(0.35, poses.flagSwing, limbs: .hands)
+                at(0.42, rest, limbs: .hands)
+            }
         case .climb:
             // Out already (the climb's own entrance), or turn from the peek
             // to the card; climb hand over hand (each half-cycle rises one
             // reach); leave the climb's own way (the exit), or turn back.
-            if !(climbing && comesOut != nil) { play(poses.climbTurnIn) }
+            if !entersOwnWay { play(poses.climbTurnIn) }
             for _ in 0..<repeats {
                 at(0.36, poses.climbB, limbs: poses.climbFromA, travel: poses.climbReach)
                 at(0.36, poses.climbA, limbs: poses.climbFromB, travel: poses.climbReach)
             }
-            if !(climbing && variation.exit != nil) { play(poses.climbTurnOut) }
+            if !leavesOwnWay { play(poses.climbTurnOut) }
         case .wave:
             let up = rest.with {
                 $0.armL = -8; $0.elbowL = 4; $0.armR = 148; $0.elbowR = -18; $0.tilt = -7
@@ -958,8 +1016,8 @@ struct FigureTimeline: Equatable, Sendable {
             at(0.3, rest)
         }
         if let exit = variation.exit {
-            hold(variation.holdAfter, settled)
-            play(climbing ? poses.climbExitSteps : Self.exitSteps(exit, edge: edge))
+            hold(variation.holdAfter, leavesOwnWay ? route?.held ?? rest : rest)
+            play(leavesOwnWay ? route?.exit ?? [] : Self.exitSteps(exit, edge: edge))
             hiddenPause = variation.hiddenPause
         } else {
             hiddenPause = nil
