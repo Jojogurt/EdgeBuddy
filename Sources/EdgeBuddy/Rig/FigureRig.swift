@@ -26,19 +26,21 @@ enum FigureAction: Equatable, Sendable {
     case swing
     /// Bottom edge: pulls itself up until the head reaches the edge.
     case pullUp
-    /// Side edge: leans further out from behind the edge and looks around.
+    /// Side edge: beside the card, a hand on its edge, hangs further out and
+    /// looks around.
     case peek
-    /// Side edge: both hands on the edge, body held out flat past it.
+    /// Side edge: a human flag — hands wide apart on the edge, the body held
+    /// out flat beside the card.
     case flag
-    /// Side edge: swings outside the card, turns to it and climbs up its
-    /// edge hand over hand (`FigureTimeline.walkDistance`).
+    /// Side edge: turns to the card and climbs up the outside of its edge
+    /// hand over hand (`FigureTimeline.walkDistance`).
     case climb
 }
 
 /// The edge of an anchor the figure is at. Top: stands on it, the rest
-/// hidden below. Bottom: hangs under it, hidden above. Sides: in front of the
-/// card, cut by the edge — the hidden part is outside the card. Drawn as the
-/// trailing side; leading is its mirror image.
+/// hidden below. Bottom: hangs under it, hidden above. Sides: beside the
+/// card, outside its edge — the card hides whatever is behind it (inside the
+/// edge). Drawn as the trailing side; leading is its mirror image.
 enum FigureEdge: CaseIterable, Hashable, Sendable {
     case top, bottom, leading, trailing
 
@@ -373,51 +375,55 @@ enum FigureEdgePoses {
 
     // MARK: Side — drawn at the trailing edge (grid x `sideEdgeX`), card to the left
 
-    /// The card's side edge in the rig's grid: everything right of it is
-    /// outside the card and never shows.
+    /// The card's side edge in the rig's grid. The card hides the figure:
+    /// everything left of the edge is behind it (only the hands wrapped on
+    /// the edge show, `sideMaskX`); the figure plays right of it, outside.
     static let sideEdgeX = 100.0
-
-    /// Leaning in from behind the edge, head first, a hand on the card's
-    /// edge — the side's rest.
-    static let peek = rest.with {
-        $0.armL = -63.3; $0.elbowL = 123.6; $0.legL = -4; $0.legR = 6
-        $0.lean = -18; $0.x = 56; $0.tilt = -10
-    }
-    /// The side's nod.
-    static let peekTilt = peek.with { $0.tilt = 4 }
-    static let peekOut = peek.with { $0.armL = -40.7; $0.elbowL = 117.4; $0.lean = -28; $0.x = 52; $0.tilt = -14 }
-    static let peekLook = peekOut.with { $0.tilt = -2 }
-    /// Fully outside the card, past its side edge.
-    static let sideHidden = peek.with { $0.x = 82 }
-    /// The vertical line the side grips sit on (hands just inside the edge).
+    /// The vertical line the side grips sit on (hands wrapped on the edge).
     static let sideGripX = sideEdgeX - 2.5
+    /// Where the drawn side box starts: the gripping hands' caps show, the
+    /// rest of the card hides the figure.
+    static let sideMaskX = sideGripX - Double(FigureSkeleton.limbWidth) / 2
+    /// Where the peek's hand holds the edge.
+    static let peekGrip = CGPoint(x: sideGripX, y: 52)
 
-    /// `pose` mirrored around `sideGripX`: hands on the edge stay put, the
-    /// body swaps sides of it. Negated angles mirror every bone.
-    static func mirroredAtSideGrip(_ pose: FigureJoints) -> FigureJoints {
-        pose.with {
-            $0.armL = -pose.armL; $0.elbowL = -pose.elbowL; $0.armR = -pose.armR; $0.elbowR = -pose.elbowR
-            $0.legL = -pose.legL; $0.kneeL = -pose.kneeL; $0.legR = -pose.legR; $0.kneeR = -pose.kneeR
-            $0.lean = -pose.lean; $0.tilt = -pose.tilt
-            $0.x = 2 * sideGripX - 100 - pose.x
-        }
+    /// Beside the card, outside its side edge: the near hand on the edge,
+    /// elbow down, the other on the hip, leaning out a little, head turned
+    /// to the card — the side's rest.
+    static let peek = rest.with {
+        $0.armL = -60; $0.elbowL = -60; $0.legL = -4; $0.legR = 6
+        $0.lean = 6; $0.x = 66; $0.tilt = -8
+    }.placing(armL: peekGrip)
+    /// The side's nod.
+    static let peekTilt = peek.with { $0.tilt = 6 }
+    /// Hanging out from the edge on a longer arm, looking away from the card.
+    static let peekOut = peek.with { $0.lean = 16; $0.x = 70; $0.tilt = 4 }.placing(armL: peekGrip)
+    static let peekLook = peekOut.with { $0.tilt = -6 }
+    /// Fully behind the card, left of its side edge (and of `sideMaskX`).
+    static let sideHidden = peek.with { $0.x = 14 }
+
+    /// Where the flag holds the edge: the upper hand high on a straight arm
+    /// (pulling), the lower one well down on it (pushing).
+    static let flagGripTop = CGPoint(x: sideGripX, y: 35)
+    static let flagGripBottom = CGPoint(x: sideGripX, y: 76)
+    /// The flag's body held out sideways from the edge: torso flat, head to
+    /// the card, the upper shoulder (`R`) above the lower (`L`).
+    private static let flagBody = rest.with {
+        $0.armL = -140; $0.elbowL = -1; $0.armR = -220; $0.elbowR = 1
+        $0.legL = 95; $0.legR = 85; $0.lean = -90; $0.x = 94; $0.y = -14
     }
-
-    /// Swinging out from the peek into the flag, past the card's edge; the
-    /// far hand already grips the edge where the flag holds it.
-    static let flagSwing = mirroredAtSideGrip(rest.with {
-        $0.armL = 85.6; $0.elbowL = 106.9; $0.armR = 134.9; $0.elbowR = -117.6
-        $0.legL = -40; $0.kneeL = 10; $0.legR = -30; $0.kneeR = -10
-        $0.lean = 40; $0.x = 20; $0.y = -6; $0.tilt = -6
-    }).placing(armL: FigureSkeleton(flagA).armL[2])
-    /// The flag: both hands on the card's edge, the body straight out
-    /// beside the card (outside it), legs scissoring between `flagA` and
-    /// `flagB`. Past a full-width card it is cut at the screen's edge.
-    static let flagA = mirroredAtSideGrip(rest.with {
-        $0.armL = 165.7; $0.elbowL = 52.7; $0.armR = -165.7; $0.elbowR = -52.7
-        $0.legL = -80; $0.legR = -100; $0.lean = 90; $0.y = -18
-    })
-    static let flagB = flagA.with { $0.legL = 98; $0.legR = 84 }
+    /// The flag: hands wide apart on the card's edge, the body straight out
+    /// beside the card, legs scissoring between `flagA` and `flagB`. Past a
+    /// card near the screen's edge it is cut there.
+    static let flagA = flagBody.placing(armL: flagGripBottom, armR: flagGripTop)
+    static let flagB = flagBody.with { $0.legL = 80; $0.legR = 100 }.placing(armL: flagGripBottom, armR: flagGripTop)
+    /// Half-way from the peek into the flag: hands already on the flag's
+    /// grips, body tilted 45°, knees bent.
+    static let flagSwing = rest.with {
+        $0.armL = -100; $0.elbowL = -1; $0.armR = -200; $0.elbowR = 1
+        $0.legL = 40; $0.kneeL = -20; $0.legR = 20; $0.kneeR = -10
+        $0.lean = -45; $0.x = 80; $0.y = -6; $0.tilt = 15
+    }.placing(armL: flagGripBottom, armR: flagGripTop)
 
     /// How far the climb rises per half-cycle (one hand's pull), grid
     /// units: each hand and foot moves this much along the edge, so a held
@@ -426,14 +432,14 @@ enum FigureEdgePoses {
     /// The line the climbing feet press on: the card's edge.
     static let climbFootX = sideEdgeX - 0.5
     /// The high hand (`climbA`'s right) and the low foot, grid y.
-    private static let climbHandTop = 24.0
-    private static let climbFootBottom = 104.3
+    private static let climbHandTop = 26.0
+    private static let climbFootBottom = 102.0
     /// Outside the card in profile, facing it: hip past the edge, elbows
     /// down, knees up toward the card.
     private static let climbBody = rest.with {
         $0.armL = 0; $0.elbowL = 60; $0.armR = 0; $0.elbowR = 60
         $0.legL = 0; $0.kneeL = -60; $0.legR = 0; $0.kneeR = -60
-        $0.lean = 8; $0.x = 60; $0.y = 2; $0.profile = 1; $0.facing = -1
+        $0.lean = 8; $0.x = 64; $0.y = 2; $0.profile = 1; $0.facing = -1
     }
     /// Climbing up the outside of the side edge, hand over hand: the right
     /// hand and the left foot high, the others a reach lower; `climbB` swaps them.
@@ -607,16 +613,6 @@ struct FigureTimeline: Equatable, Sendable {
     /// the stage picks the target (the run).
     let walkDistance: Double?
 
-    /// While the flag or the climb plays at a side, the part of the figure
-    /// outside the card's edge shows: it ramps in over the first window and
-    /// out over the second (seconds from the start); nil = it stays hidden.
-    let outsideReveal: OutsideReveal?
-
-    struct OutsideReveal: Equatable, Sendable {
-        var rampIn: ClosedRange<Double>
-        var rampOut: ClosedRange<Double>
-    }
-
     /// Set when the sequence ends hidden behind the card (`FigureVariation.exit`):
     /// how long it stays there before the next cycle, seconds.
     let hiddenPause: Double?
@@ -683,7 +679,6 @@ struct FigureTimeline: Equatable, Sendable {
         let poses = FigureEdgePoses.self
         let repeats = variation.repeats ?? Self.canvasRepeats(action)
         var walk: ClosedRange<Double>?
-        var reveal: OutsideReveal?
 
         if reduceMotion {
             frames.append(Keyframe(time: 0, joints: rest, easing: .inOut))
@@ -694,7 +689,6 @@ struct FigureTimeline: Equatable, Sendable {
             relocatesAt = nil
             walkWindow = nil
             walkDistance = nil
-            outsideReveal = nil
             hiddenPause = nil
             return
         }
@@ -761,32 +755,26 @@ struct FigureTimeline: Equatable, Sendable {
             at(0.24, poses.peekTilt, limbs: Self.peekGrip)
             at(0.3, rest, limbs: Self.peekGrip)
         case .flag:
-            let swingOut = time
-            at(0.4, poses.flagSwing)
-            let revealIn = swingOut...time
-            // The far hand holds on where the swing put it; the near one lands.
-            at(0.35, poses.flagA, .out, limbs: LimbPaths(armL: .held))
+            // The near hand slides down the edge to its grip, the other
+            // reaches straight up to the upper one.
+            at(0.4, poses.flagSwing, limbs: .hands)
+            // Both hands hold their grips while the body swings out flat.
+            at(0.35, poses.flagA, limbs: .hands)
             for _ in 0..<repeats {
                 at(0.22, poses.flagB, limbs: .hands)
                 at(0.22, poses.flagA, limbs: .hands)
             }
-            at(0.35, poses.flagSwing, limbs: LimbPaths(armL: .held))
-            let swingBack = time
-            at(0.42, rest)
-            reveal = OutsideReveal(rampIn: revealIn, rampOut: swingBack...time)
+            at(0.35, poses.flagSwing, limbs: .hands)
+            at(0.42, rest, limbs: .hands)
         case .climb:
-            // Swing out past the edge and turn to the card, climb hand over
-            // hand (each half-cycle rises one reach), swing back to the peek.
-            let turnIn = time
+            // Turn to the card, climb hand over hand (each half-cycle rises
+            // one reach), turn back to the peek.
             at(0.42, poses.climbA)
-            let revealIn = turnIn...time
             for _ in 0..<repeats {
                 at(0.36, poses.climbB, limbs: poses.climbFromA, travel: poses.climbReach)
                 at(0.36, poses.climbA, limbs: poses.climbFromB, travel: poses.climbReach)
             }
-            let turnBack = time
             at(0.42, rest)
-            reveal = OutsideReveal(rampIn: revealIn, rampOut: turnBack...time)
         case .wave:
             let up = rest.with {
                 $0.armL = -8; $0.elbowL = 4; $0.armR = 148; $0.elbowR = -18; $0.tilt = -7
@@ -919,7 +907,6 @@ struct FigureTimeline: Equatable, Sendable {
             walkDistance = nil
         }
         walkWindow = walk
-        outsideReveal = reveal
     }
 
     /// The peek's hand on the card's edge holds on (`FigureEdgePoses.peek`).
@@ -955,7 +942,7 @@ struct FigureTimeline: Equatable, Sendable {
     /// The steps from `hiddenPose(entrance, edge:)` up to the edge's rest.
     /// Only the top uses `entrance`: the bottom lowers itself from behind the
     /// card on bent arms (hands sliding down the grip line) and straightens
-    /// into the hang; a side slides in from outside the card, head first.
+    /// into the hang; a side slides out from behind the card's edge.
     static func entranceSteps(_ entrance: FigureEntrance, edge: FigureEdge = .top) -> [Step] {
         let poses = FigureEdgePoses.self
         switch edge {
@@ -1013,7 +1000,7 @@ struct FigureTimeline: Equatable, Sendable {
     /// Keyframes per run cycle — enough that linear blends read as a curve.
     static let runSamplesPerCycle = 12
 
-    /// Fully behind the card (or outside it, at a side), ready for `entrance`.
+    /// Fully behind the card, ready for `entrance`.
     static func hiddenPose(_ entrance: FigureEntrance, edge: FigureEdge = .top) -> FigureJoints {
         switch edge {
         case .bottom: return FigureEdgePoses.hangHidden
@@ -1057,20 +1044,6 @@ struct FigureTimeline: Equatable, Sendable {
             Step(duration: 0.14, joints: rest),
         ]
     }()
-
-    /// How much of the area outside a side edge shows at `time`: 0 = none
-    /// (the grid is cut at `FigureEdgePoses.sideEdgeX`), 1 = a full extra
-    /// box width past it.
-    func outsideRevealFraction(at time: Double) -> Double {
-        guard let reveal = outsideReveal else { return 0 }
-        func progress(_ window: ClosedRange<Double>) -> Double {
-            let u = (time - window.lowerBound) / max(window.upperBound - window.lowerBound, 1e-6)
-            return Self.ease(min(max(u, 0), 1), .inOut)
-        }
-        if time <= reveal.rampIn.upperBound { return progress(reveal.rampIn) }
-        if time < reveal.rampOut.lowerBound { return 1 }
-        return 1 - progress(reveal.rampOut)
-    }
 
     /// 0…1 along the walk at `time` (0 before, 1 after); nil when the
     /// sequence doesn't walk. With `walkDistance` it follows the travelling
@@ -1318,11 +1291,17 @@ enum FigureRepertoire {
         }
     }
 
+    /// Actions at a side at the screen's edge: no room beside the card to
+    /// hang out or hold a flag, only to climb.
+    static let screenEdgeSide: [FigureAction] = [.climb]
+
     /// The repertoire of `edge` with room to travel `room` grid units along
     /// it: actions whose limbs need more (`FigureTimeline.minimumTravel` —
     /// the climb on a short side, the worm walk on a narrow card) drop out.
-    static func actions(for edge: FigureEdge, room: Double) -> [FigureAction] {
-        actions(for: edge).filter { (FigureTimeline.minimumTravel($0) ?? 0) <= room + 1e-9 }
+    /// A side `atScreenEdge` only climbs (`screenEdgeSide`).
+    static func actions(for edge: FigureEdge, room: Double, atScreenEdge: Bool = false) -> [FigureAction] {
+        let all = edge.isSide && atScreenEdge ? screenEdgeSide : actions(for: edge)
+        return all.filter { (FigureTimeline.minimumTravel($0) ?? 0) <= room + 1e-9 }
     }
 
     /// A random action from `actions`, never `previous` twice in a row
@@ -1350,6 +1329,10 @@ struct FigureSizes: Equatable, Sendable {
     /// plus its shortest climb (`FigureTimeline.minimumTravel(.climb)`).
     /// Shorter sides still take the peek and the flag.
     var climbMinHeight: CGFloat = 0
+    /// A side closer than this to the viewport's edge is at the screen's
+    /// edge: no room beside the card, so it only climbs there
+    /// (`FigureAnchorPicker.isAtScreenEdge`).
+    var screenEdgeGap: CGFloat = 0
 }
 
 /// Which marked view (`figureAnchor`) the figure comes out from behind next —
@@ -1378,7 +1361,9 @@ enum FigureAnchorPicker {
     /// The figure fits at `edge` of `rect` and the whole of it shows. Top as
     /// `isEligible(rect:viewport:figureHeight:minWidth:)`; bottom: wide enough,
     /// the edge on screen and the hang above the viewport's bottom; sides: tall
-    /// enough, with that much of the card's height on screen.
+    /// enough, with that much of the card's height on screen and the side
+    /// edge itself on screen — at the screen's edge (`isAtScreenEdge`, it
+    /// only climbs there) tall enough on screen for the climb.
     static func isEligible(rect: CGRect, edge: FigureEdge, viewport: CGRect?, sizes: FigureSizes) -> Bool {
         switch edge {
         case .top:
@@ -1395,10 +1380,28 @@ enum FigureAnchorPicker {
         case .leading, .trailing:
             guard rect.height >= sizes.sideMinHeight else { return false }
             guard let viewport else { return true }
+            // The figure stands beside the card: the edge itself must be on
+            // screen (the figure past it may be cut by the screen's edge).
+            let x = edge == .trailing ? rect.maxX : rect.minX
             let track = sideTrack(rect: rect, viewport: viewport)
-            return rect.minX >= viewport.minX - 0.5
-                && rect.maxX <= viewport.maxX + 0.5
-                && track.upperBound - track.lowerBound >= sizes.sideMinHeight
+            let needed = isAtScreenEdge(rect: rect, edge: edge, viewport: viewport, gap: sizes.screenEdgeGap)
+                ? max(sizes.sideMinHeight, sizes.climbMinHeight)
+                : sizes.sideMinHeight
+            return x >= viewport.minX - 0.5
+                && x <= viewport.maxX + 0.5
+                && track.upperBound - track.lowerBound >= needed
+        }
+    }
+
+    /// `edge` of `rect` is a side less than `gap` from the viewport's edge
+    /// on that side — no room beside the card. Never for top and bottom, or
+    /// without a viewport (a single card).
+    static func isAtScreenEdge(rect: CGRect, edge: FigureEdge, viewport: CGRect?, gap: CGFloat) -> Bool {
+        guard let viewport else { return false }
+        switch edge {
+        case .top, .bottom: return false
+        case .trailing: return viewport.maxX - rect.maxX < gap
+        case .leading: return rect.minX - viewport.minX < gap
         }
     }
 
@@ -1409,25 +1412,38 @@ enum FigureAnchorPicker {
         return top...max(top, bottom)
     }
 
-    /// Where the figure comes out next: a random eligible anchor other than
-    /// `current` (the same one only when it is the only one), then an edge of
-    /// it drawn by `FigureEdge.weight` among its allowed, eligible edges.
-    /// nil when no anchor fits anywhere.
+    /// Where the figure comes out next, among the allowed, eligible edges of
+    /// the anchors, preferring in turn: a place that `offersFresh` (it can
+    /// play something other than the last action — nil = any), another
+    /// anchor than `current`, another edge than `currentEdge` of the same
+    /// anchor. Among what is left an edge is drawn by `FigureEdge.weight`,
+    /// then an anchor with it. nil when no anchor fits anywhere.
     static func nextPlacement<ID: Hashable>(
-        current: ID?, candidates: [(id: ID, rect: CGRect, edges: FigureEdges)], viewport: CGRect?,
-        sizes: FigureSizes, allowed: FigureEdges = .all, using generator: inout some RandomNumberGenerator
+        current: ID?, currentEdge: FigureEdge? = nil,
+        candidates: [(id: ID, rect: CGRect, edges: FigureEdges)], viewport: CGRect?,
+        sizes: FigureSizes, allowed: FigureEdges = .all,
+        offersFresh: ((_ id: ID, _ rect: CGRect, _ edge: FigureEdge) -> Bool)? = nil,
+        using generator: inout some RandomNumberGenerator
     ) -> (id: ID, edge: FigureEdge)? {
         let pairs = candidates.flatMap { candidate in
             FigureEdge.allCases
                 .filter { candidate.edges.intersection(allowed).contains($0.member) }
                 .filter { isEligible(rect: candidate.rect, edge: $0, viewport: viewport, sizes: sizes) }
-                .map { (id: candidate.id, edge: $0) }
+                .map { (id: candidate.id, rect: candidate.rect, edge: $0) }
         }
-        let others = pairs.filter { $0.id != current }
-        let pool = others.isEmpty ? pairs : others
+        func preferring(
+            _ pool: [(id: ID, rect: CGRect, edge: FigureEdge)],
+            _ keep: ((id: ID, rect: CGRect, edge: FigureEdge)) -> Bool
+        ) -> [(id: ID, rect: CGRect, edge: FigureEdge)] {
+            let kept = pool.filter(keep)
+            return kept.isEmpty ? pool : kept
+        }
+        var pool = preferring(pairs) { offersFresh?($0.id, $0.rect, $0.edge) ?? true }
+        pool = preferring(pool) { $0.id != current }
+        pool = preferring(pool) { $0.id != current || $0.edge != currentEdge }
         let edges = FigureEdge.allCases.filter { edge in pool.contains { $0.edge == edge } }
         guard let edge = weightedEdge(edges, using: &generator) else { return nil }
-        return pool.filter { $0.edge == edge }.randomElement(using: &generator)
+        return pool.filter { $0.edge == edge }.randomElement(using: &generator).map { (id: $0.id, edge: $0.edge) }
     }
 
     /// One of `edges`, drawn by `FigureEdge.weight` (renormalized).

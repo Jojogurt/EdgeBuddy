@@ -11,11 +11,18 @@ somewhere else:
   handstand or runs along the edge;
 - **bottom edge** — hangs under it (wide grip): swings like a pendulum, pulls
   itself up;
-- **leading / trailing edge** — peeks around it, holds itself out past it like
-  a flag, climbs up its outside hand over hand (only where enough of the side
-  is on screen).
+- **leading / trailing edge** — slides out from behind the card and plays
+  beside it, outside its edge, holding on: hangs out and looks around, does a
+  human flag (hands wide apart on the edge, body held out flat), climbs up the
+  edge hand over hand (only where enough of the side is on screen). Nothing
+  plays over the card. A side less than ~28 pt from the screen's edge (a
+  full-width card, the outer side of a tile) has no room beside it and only
+  climbs there — the figure may be cut by the screen's edge; a side facing
+  other content (the inner side of a tile in an `HStack`) gets everything,
+  even if the figure overlaps the neighbour.
 
-A tap sends it to another card. It rides along while the content scrolls and
+A tap sends it to another card. It never plays the same action twice in a
+row (nor the same edge of the same card) while there is something else to do. It rides along while the content scrolls and
 waits for the scroll to stop before coming out again.
 
 <!-- TODO: GIFs — a screen with several cards (top + bottom + sides), a single
@@ -121,7 +128,7 @@ there is another), then an edge of it, evenly:
 |---|---|---|
 | top | 25 % | ~108 pt wide; room above the card on screen |
 | bottom | 25 % | ~108 pt wide; room under the card on screen |
-| leading / trailing | 25 % each | ~82 pt of the card's height on screen |
+| leading / trailing | 25 % each | that edge on screen and ~82 pt of the card's height (~136 pt at the screen's edge, where it only climbs) |
 
 Weights are renormalized over the edges that are possible right now. Some
 actions need more room: the climb needs ~136 pt of the side on screen (it

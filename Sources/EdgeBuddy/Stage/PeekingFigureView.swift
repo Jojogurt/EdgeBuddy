@@ -70,27 +70,19 @@ struct PeekingFigureView: View {
             if let rect = place.anchor.flatMap(rect(for:)) {
                 let pose = joints(at: elapsed, edge: place.edge)
                 let frame = figureFrame(at: place.edge, spot: place.spot, on: rect)
-                // Sides draw one more box width past the card's edge, shown
-                // only while the flag sticks out there.
-                let outside = place.edge.isSide ? frame.width : 0
-                let shown = (frame.width + outside * timeline.outsideRevealFraction(at: elapsed)) / (frame.width + outside)
-                let box = PeekingFigureMetrics.box(for: place.edge)
-                FigureCanvas(
-                    joints: pose, color: color,
-                    viewBox: CGRect(x: box.minX, y: box.minY, width: box.width * (frame.width + outside) / frame.width, height: box.height)
-                )
+                FigureCanvas(joints: pose, color: color, viewBox: PeekingFigureMetrics.box(for: place.edge))
                     .opacity(timeline.opacity(at: elapsed))
-                    .frame(width: frame.width + outside, height: frame.height)
-                    .clipShape(LeadingFraction(fraction: shown))
-                    .contentShape(LeadingFraction(fraction: shown))
-                    // Sides are drawn at the trailing edge; leading mirrors it
-                    // (around the card's edge, the drawn box's middle).
+                    .frame(width: frame.width, height: frame.height)
+                    // Whatever is behind the card (past the box) never shows.
+                    .clipped()
+                    .contentShape(Rectangle())
+                    // Sides are drawn at the trailing edge; leading mirrors it.
                     .scaleEffect(x: place.edge == .leading ? -1 : 1, y: 1)
                     .onTapGesture { tapped() }
                     // Only the figure itself takes taps, and only once it is
                     // out — never the content it covers.
                     .allowsHitTesting(Self.isOut(pose, at: place.edge))
-                    .position(x: drawnMidX(frame, edge: place.edge, on: rect), y: frame.midY)
+                    .position(x: frame.midX, y: frame.midY)
             }
         }
         .accessibilityHidden(true)
@@ -193,7 +185,7 @@ struct PeekingFigureView: View {
         switch edge {
         case .top: pose.y < 40
         case .bottom: pose.y > -40
-        case .leading, .trailing: pose.x < 72
+        case .leading, .trailing: pose.x > 44
         }
     }
 
@@ -202,8 +194,8 @@ struct PeekingFigureView: View {
     }
 
     /// The figure's box in the stage's space at `edge` of `rect`, `spot`
-    /// along that edge: above the top, under the bottom, over the side's
-    /// edge of the card (its outer side on the card's edge).
+    /// along that edge: above the top, under the bottom, beside a side —
+    /// outside the card, overlapping its edge only by the gripping hands.
     private func figureFrame(at edge: FigureEdge, spot: Double, on rect: CGRect) -> CGRect {
         let size = metrics.size(for: edge)
         switch edge {
@@ -219,18 +211,9 @@ struct PeekingFigureView: View {
                 fraction: spot, track: rect.minY...rect.maxY,
                 boxHeight: size.height, margin: metrics.sideMargin
             )
-            let x = edge == .trailing ? rect.maxX - size.width : rect.minX
+            // Outside the card, overlapping its edge by the gripping hands.
+            let x = edge == .trailing ? rect.maxX - metrics.sideOverlap : rect.minX + metrics.sideOverlap - size.width
             return CGRect(x: x, y: top, width: size.width, height: size.height)
-        }
-    }
-
-    /// Middle of the drawn box: the logical box (`figureFrame`) plus, at a
-    /// side, one more width past the card's edge — so the middle is the edge.
-    private func drawnMidX(_ frame: CGRect, edge: FigureEdge, on rect: CGRect) -> CGFloat {
-        switch edge {
-        case .top, .bottom: frame.midX
-        case .trailing: rect.maxX
-        case .leading: rect.minX
         }
     }
 
@@ -284,17 +267,37 @@ struct PeekingFigureView: View {
     /// (one entrance and standing).
     private var allowedEdges: FigureEdges { canLoop ? .all : .top }
 
-    /// A random anchor and edge fully on screen, on another anchor than
-    /// `current` when there is one; nil = none.
-    private func pick(excluding current: AnyHashable?) -> (id: AnyHashable, edge: FigureEdge)? {
+    /// A random anchor and edge fully on screen: one where it can play
+    /// something other than `lastAction`, on another anchor than `current`
+    /// (or another edge of it) when there is one; nil = none.
+    private func pick(
+        excluding current: AnyHashable?, edge currentEdge: FigureEdge? = nil
+    ) -> (id: AnyHashable, edge: FigureEdge)? {
         var generator = SystemRandomNumberGenerator()
+        let previous = lastAction
         return FigureAnchorPicker.nextPlacement(
             current: current,
+            currentEdge: currentEdge,
             candidates: anchors.map { (id: $0.id, rect: $0.rect, edges: $0.edges) },
             viewport: viewport,
             sizes: metrics.sizes,
             allowed: allowedEdges,
+            offersFresh: { _, rect, edge in
+                actions(at: edge, on: rect, from: nil).contains { $0 != previous }
+            },
             using: &generator
+        )
+    }
+
+    /// What it may play at `edge` of `rect` starting at `spot` (nil = it
+    /// pops up and picks the spot): the edge's repertoire with the room to
+    /// travel there — only the climb at a side by the screen's edge.
+    private func actions(at edge: FigureEdge, on rect: CGRect, from spot: Double?) -> [FigureAction] {
+        FigureRepertoire.actions(
+            for: edge, room: metrics.travelRoom(at: edge, on: rect, viewport: viewport, from: spot),
+            atScreenEdge: FigureAnchorPicker.isAtScreenEdge(
+                rect: rect, edge: edge, viewport: viewport, gap: metrics.screenEdgeGap
+            )
         )
     }
 
@@ -364,7 +367,7 @@ struct PeekingFigureView: View {
         // Out of sight (ducking, or hidden behind the cards): pop up elsewhere.
         let popsUp = relocating || isHidden
         if popsUp {
-            let next = pick(excluding: current.anchor)
+            let next = pick(excluding: current.anchor, edge: current.edge)
             anchorID = next?.id ?? current.anchor
             edge = next?.edge ?? (allowedEdges.contains(current.edge.member) ? current.edge : .top)
         }
@@ -376,17 +379,18 @@ struct PeekingFigureView: View {
             metrics.travelRoom(at: edge, on: $0, viewport: viewport, from: popsUp ? nil : current.spot)
         } ?? 0
         // Low Power Mode: no action, only the rest pose (and its entrance).
+        // Never the last action again while the edge has another.
         let played: FigureAction
         if ProcessInfo.processInfo.isLowPowerModeEnabled {
             played = .rest
         } else if let override {
             played = override
         } else {
-            played = FigureRepertoire.next(
-                after: lastAction, from: FigureRepertoire.actions(for: edge, room: room), using: &generator
-            )
-            lastAction = played
+            let available = rect.map { actions(at: edge, on: $0, from: popsUp ? nil : current.spot) }
+                ?? FigureRepertoire.actions(for: edge, room: room)
+            played = FigureRepertoire.next(after: lastAction, from: available, using: &generator)
         }
+        lastAction = played
         let span = rect.map { metrics.travelSpan(at: edge, on: $0) } ?? 0
         if popsUp {
             if played == .climb {
@@ -436,15 +440,5 @@ struct PeekingFigureView: View {
         hasPlayed = true
         startDate = .now
         playID += 1
-    }
-}
-
-
-/// The leading `fraction` of a view's width — the side figure's visible part.
-private struct LeadingFraction: Shape {
-    var fraction: Double
-
-    func path(in rect: CGRect) -> Path {
-        Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width * min(max(fraction, 0), 1), height: rect.height))
     }
 }

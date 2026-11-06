@@ -35,9 +35,15 @@ struct PeekingFigureMetrics: Equatable, Sendable {
     /// What the hanging figure draws under a bottom edge: from the edge (its
     /// top) down past the feet, the full width.
     static let hangBox = CGRect(x: 0, y: FigureEdgePoses.bottomEdgeY, width: 100, height: 94)
-    /// What a side figure draws: the card's side edge is the box's trailing
-    /// edge (leading = mirrored), tall enough for the peek, flag and climb.
-    static let sideBox = CGRect(x: 0, y: 0, width: FigureEdgePoses.sideEdgeX, height: 112)
+    /// What a side figure draws: beside the card, outside its side edge
+    /// (drawn at the trailing edge, leading = mirrored), from just inside the
+    /// edge (`FigureEdgePoses.sideMaskX`, the gripping hands) out to grid x
+    /// 200 (the flag's feet), tall enough for the peek, flag and climb.
+    static let sideBox = CGRect(
+        x: FigureEdgePoses.sideMaskX, y: 0, width: 2 * FigureEdgePoses.sideEdgeX - FigureEdgePoses.sideMaskX, height: 112
+    )
+    /// How far the side box reaches over the card, past its edge, points.
+    var sideOverlap: CGFloat { (FigureEdgePoses.sideEdgeX - FigureEdgePoses.sideMaskX) * scale }
     /// Smallest gap from a side box to the visible ends of the card's edge
     /// (12 pt at the default height).
     var sideMargin: CGFloat { 12 * height / Self.defaultHeight }
@@ -64,9 +70,14 @@ struct PeekingFigureMetrics: Equatable, Sendable {
             figureHeight: height, minWidth: minimumAnchorWidth,
             hangHeight: size(for: .bottom).height,
             sideMinHeight: side,
-            climbMinHeight: (side + (FigureTimeline.minimumTravel(.climb) ?? 0) * scale).rounded(.up)
+            climbMinHeight: (side + (FigureTimeline.minimumTravel(.climb) ?? 0) * scale).rounded(.up),
+            screenEdgeGap: screenEdgeGap
         )
     }
+
+    /// A side closer than this to the screen's edge only climbs (28 pt at
+    /// the default height: wider than the usual 16 pt gutter).
+    var screenEdgeGap: CGFloat { 28 * height / Self.defaultHeight }
 
     /// Points the box moves along `edge` of `rect` between the spots 0 and
     /// 1 (`FigurePlacement`): the free width (top, bottom) or height (sides).

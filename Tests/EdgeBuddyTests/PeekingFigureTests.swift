@@ -471,17 +471,18 @@ struct PeekingFigureTests {
         #expect(timeline.keyframes.contains { $0.joints == FigureTimeline.restPose(edge) })
     }
 
-    @Test("Hidden edge poses stay entirely behind or outside the card")
+    @Test("Hidden edge poses stay entirely behind the card")
     func hiddenEdgePoses() {
         let reach = FigureSkeleton.limbWidth / 2 + 0.5
         // Bottom: everything above the card's bottom edge (and the head's radius).
         for point in points(FigureEdgePoses.hangHidden) {
             #expect(point.y + FigureSkeleton.headRadius < FigureEdgePoses.bottomEdgeY)
         }
-        // Side: everything right of the card's side edge.
+        // Side: everything left of what the side box draws (behind the card).
         for point in points(FigureEdgePoses.sideHidden) {
-            #expect(point.x - max(reach, FigureSkeleton.headRadius) > FigureEdgePoses.sideEdgeX)
+            #expect(point.x + max(reach, FigureSkeleton.headRadius) < FigureEdgePoses.sideMaskX)
         }
+        #expect(extent(FigureEdgePoses.sideHidden).maxX < PeekingFigureMetrics.sideBox.minX)
     }
 
     @Test("Hands keep their grip on the edge while hanging, pulling up and swinging")
@@ -496,7 +497,7 @@ struct PeekingFigureTests {
         }
     }
 
-    @Test("Flag holds the side edge with both hands, body outside the card; peek with one, head on the card")
+    @Test("Flag holds the side edge with both hands, body outside the card; peek with one, beside the card")
     func sideGrips() {
         for pose in [FigureEdgePoses.flagA, FigureEdgePoses.flagB] {
             let s = FigureSkeleton(pose)
@@ -509,8 +510,8 @@ struct PeekingFigureTests {
             #expect(abs(s.hip.y - s.torsoTop.y) < 0.5)
         }
         let peek = FigureSkeleton(FigureEdgePoses.peek)
-        #expect(distance(peek.armL[2], CGPoint(x: FigureEdgePoses.sideEdgeX - 2.5, y: 64)) < 0.6)
-        #expect(peek.head.x + FigureSkeleton.headRadius < FigureEdgePoses.sideEdgeX)
+        #expect(distance(peek.armL[2], FigureEdgePoses.peekGrip) < 1e-6)
+        #expect(peek.head.x - FigureSkeleton.headRadius > FigureEdgePoses.sideEdgeX)
         // Climb: the hip outside the card, facing it.
         #expect(FigureSkeleton(FigureEdgePoses.climbA).hip.x > FigureEdgePoses.sideEdgeX)
         #expect(FigureEdgePoses.climbA.facing == -1)
@@ -551,7 +552,7 @@ struct PeekingFigureTests {
     }
 
     private let sizes = FigureSizes(
-        figureHeight: 56, minWidth: 108, hangHeight: 49, sideMinHeight: 82, climbMinHeight: 136
+        figureHeight: 56, minWidth: 108, hangHeight: 49, sideMinHeight: 82, climbMinHeight: 136, screenEdgeGap: 28
     )
 
     @Test("Bottom and side eligibility: hang above the tab bar, side tall enough on screen")
@@ -559,7 +560,8 @@ struct PeekingFigureTests {
         func ok(_ rect: CGRect, _ edge: FigureEdge) -> Bool {
             FigureAnchorPicker.isEligible(rect: rect, edge: edge, viewport: viewport, sizes: sizes)
         }
-        let card = CGRect(x: 16, y: 300, width: 368, height: 120)
+        // Clear of the screen's edges, so the sides take the full repertoire.
+        let card = CGRect(x: 40, y: 300, width: 320, height: 120)
         for edge in FigureEdge.allCases { #expect(ok(card, edge)) }
         // Bottom: the hang would reach under the tab bar.
         #expect(!ok(CGRect(x: 16, y: 560, width: 368, height: 100), .bottom))
@@ -568,31 +570,37 @@ struct PeekingFigureTests {
         #expect(!ok(CGRect(x: 16, y: -100, width: 368, height: 210), .bottom))
         // Side: too short a card, or too little of it on screen.
         #expect(!ok(CGRect(x: 16, y: 300, width: 368, height: 60), .trailing))
-        #expect(!ok(CGRect(x: 16, y: 640, width: 368, height: 300), .leading))
-        #expect(ok(CGRect(x: 16, y: 600, width: 368, height: 300), .leading))
+        #expect(!ok(CGRect(x: 40, y: 640, width: 320, height: 300), .leading))
+        #expect(ok(CGRect(x: 40, y: 600, width: 320, height: 300), .leading))
     }
 
-    @Test("Flag reveals the outside of a side edge only while it sticks out")
-    func flagOutsideReveal() {
+    @Test("Flag: a human flag — grips wide apart on the edge, upper arm straight, arms never crossed")
+    func flagGrips() {
+        let top = FigureEdgePoses.flagGripTop, bottom = FigureEdgePoses.flagGripBottom
+        #expect(bottom.y - top.y >= 25)
+        #expect(top.x == FigureEdgePoses.sideGripX && bottom.x == FigureEdgePoses.sideGripX)
         let flag = FigureTimeline(action: .flag, entrance: nil, reduceMotion: false, edge: .trailing)
-        let reveal = try! #require(flag.outsideReveal)
-        #expect(flag.outsideRevealFraction(at: 0) == 0)
-        #expect(flag.outsideRevealFraction(at: reveal.rampIn.upperBound) == 1)
-        #expect(flag.outsideRevealFraction(at: (reveal.rampIn.upperBound + reveal.rampOut.lowerBound) / 2) == 1)
-        #expect(flag.outsideRevealFraction(at: flag.duration) == 0)
-        // At both ends the pose is the peek, fully inside the edge's grid
-        // except the legs behind it — nothing pops when the reveal starts.
-        #expect(flag.joints(at: reveal.rampIn.lowerBound) == FigureEdgePoses.peek)
-        for action in [FigureAction.peek, .rest] {
-            let other = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: .trailing)
-            #expect(other.outsideReveal == nil)
+        for time in samples(flag) {
+            let s = FigureSkeleton(flag.joints(at: time))
+            let flagPoses = [FigureEdgePoses.flagSwing, FigureEdgePoses.flagA, FigureEdgePoses.flagB]
+            guard let (a, b) = segment(flag, at: time), flagPoses.contains(a.joints), flagPoses.contains(b.joints)
+            else { continue }
+            // The upper hand is the upper arm's (`R`), the lower the lower's.
+            #expect(distance(s.armR[2], top) < 0.6 && distance(s.armL[2], bottom) < 0.6, "at \(time)")
+            #expect(s.armR[0].y < s.armL[0].y)
+            // Not crossed: the upper arm's elbow stays above the lower arm's.
+            #expect(s.armR[1].y < s.armL[1].y)
+        }
+        for pose in [FigureEdgePoses.flagA, FigureEdgePoses.flagB] {
+            // Pulling on a straight upper arm.
+            #expect(abs(pose.elbowR) < 1e-6)
         }
     }
 
     @Test("Edge weights: 25% each; renormalized; top only when asked")
     func edgeWeights() {
         var generator = SystemRandomNumberGenerator()
-        let card = (id: "a", rect: CGRect(x: 16, y: 300, width: 368, height: 120), edges: FigureEdges.all)
+        let card = (id: "a", rect: CGRect(x: 40, y: 300, width: 320, height: 120), edges: FigureEdges.all)
         var counts: [FigureEdge: Int] = [:]
         let draws = 6000
         for _ in 0..<draws {
@@ -765,8 +773,10 @@ struct PeekingFigureTests {
                 guard let (a, b) = segment(timeline, at: time), !b.limbs.isEmpty else { continue }
                 let s = FigureSkeleton(timeline.joints(at: time))
                 for limb in FigureLimb.allCases where b.limbs[limb] == .held {
+                    // Grips that stay put; the others move along a line on purpose
+                    // (a hand sliding down the edge to the flag's grip).
                     let start = FigureSkeleton(a.joints).end(of: limb)
-                    #expect(distance(start, FigureSkeleton(b.joints).end(of: limb)) < 0.6)
+                    guard distance(start, FigureSkeleton(b.joints).end(of: limb)) < 0.6 else { continue }
                     #expect(distance(s.end(of: limb), start) < 0.6, "\(limb) at \(time)")
                     #expect(abs(s.end(of: limb).x - FigureEdgePoses.sideGripX) < 0.6)
                 }
@@ -791,14 +801,8 @@ struct PeekingFigureTests {
             #expect(box.minY >= 0 && box.maxY <= PeekingFigureMetrics.sideBox.height)
             #expect(box.maxX <= 2 * PeekingFigureMetrics.sideBox.width)
         }
-        // The outside ramps in from the peek and back out to it.
-        let reveal = try #require(climb.outsideReveal)
-        #expect(climb.joints(at: reveal.rampIn.lowerBound) == FigureEdgePoses.peek)
+        #expect(climb.keyframes.first?.joints == FigureEdgePoses.peek)
         #expect(climb.final == FigureEdgePoses.peek)
-        #expect(abs(reveal.rampOut.upperBound - climb.duration) < 1e-9)
-        let window = try #require(climb.walkWindow)
-        #expect(climb.outsideRevealFraction(at: window.lowerBound) == 1)
-        #expect(climb.outsideRevealFraction(at: window.upperBound) == 1)
         // A held limb stays at one spot on the card: its grid y minus the
         // distance risen so far is constant over its segment.
         for time in samples(climb) {
@@ -812,6 +816,36 @@ struct PeekingFigureTests {
                 #expect(abs(s.end(of: limb).x - start.x) < 0.6)
             }
         }
+    }
+
+    @Test("Side actions play outside the card: torso and head beside it, only the grips over the edge",
+          arguments: [FigureAction.rest, .peek, .flag, .climb])
+    func sideOutside(action: FigureAction) {
+        let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: .trailing)
+        for time in samples(timeline) {
+            let s = FigureSkeleton(timeline.joints(at: time))
+            #expect(s.hip.x > FigureEdgePoses.sideEdgeX && s.torsoTop.x > FigureEdgePoses.sideEdgeX, "torso at \(time)")
+            #expect(s.head.x > FigureEdgePoses.sideEdgeX, "head at \(time)")
+            // Elbows, knees and feet stay near or past the edge; hands may wrap it.
+            for point in [s.armL[1], s.armR[1], s.legL[1], s.legR[1], s.legL[2], s.legR[2], s.armL[2], s.armR[2]] {
+                #expect(point.x >= FigureEdgePoses.sideMaskX + 1.5, "limb at \(time)")
+            }
+            let box = extent(timeline.joints(at: time))
+            #expect(box.minY >= 0 && box.maxY <= PeekingFigureMetrics.sideBox.maxY, "y at \(time)")
+            #expect(box.maxX <= PeekingFigureMetrics.sideBox.maxX, "x at \(time)")
+        }
+    }
+
+    @Test("Side entrance slides out from behind the card's edge, the exit slides back")
+    func sideEntrance() {
+        var variation = FigureVariation.standard
+        variation.exit = .spring
+        let timeline = FigureTimeline(
+            action: .peek, entrance: .spring, reduceMotion: false, edge: .trailing, variation: variation
+        )
+        #expect(extent(timeline.keyframes[0].joints).maxX < FigureEdgePoses.sideMaskX)
+        #expect(extent(timeline.final).maxX < FigureEdgePoses.sideMaskX)
+        #expect(FigureTimeline.duckPose(.trailing) == FigureEdgePoses.sideHidden)
     }
 
     @Test("Climb goes up: it starts low on the side and ends a climb's distance higher")
@@ -854,7 +888,7 @@ struct PeekingFigureTests {
         // Tall enough for the peek and the flag, not for the climb.
         #expect(actions(height: sizes.climbMinHeight - 2) == [.peek, .flag])
         #expect(FigureAnchorPicker.isEligible(
-            rect: CGRect(x: 16, y: 200, width: 368, height: sizes.climbMinHeight - 2),
+            rect: CGRect(x: 40, y: 200, width: 320, height: sizes.climbMinHeight - 2),
             edge: .trailing, viewport: viewport, sizes: sizes
         ))
         // A tall card mostly off screen: only what shows counts.
@@ -938,5 +972,105 @@ struct PeekingFigureTests {
         }
         #expect(FigureStyle(appearDelay: 0...0).entranceDelay(using: &generator) == 0)
         #expect(FigureStyle(appearDelay: 1.5...1.5).entranceDelay(using: &generator) == 1.5)
+    }
+
+    // MARK: - No repeats
+
+    @Test("500 plays in a row: never the same action twice, never the same anchor and edge twice, when there is another")
+    func noRepeats() throws {
+        var generator = SystemRandomNumberGenerator()
+        let metrics = PeekingFigureMetrics.standard
+        // Tall and short cards (climb or not), wide and narrow tops (worm or not).
+        let pool: [(id: Int, rect: CGRect, edges: FigureEdges)] = [
+            (0, CGRect(x: 16, y: 150, width: 368, height: 300), .all),
+            (1, CGRect(x: 16, y: 300, width: 368, height: 100), [.leading, .trailing]),
+            (2, CGRect(x: 16, y: 300, width: 120, height: 100), [.top, .trailing]),
+            (3, CGRect(x: 16, y: 450, width: 368, height: 120), .bottom),
+            (4, CGRect(x: 16, y: 300, width: 110, height: 90), .top),
+        ]
+        func actions(_ rect: CGRect, _ edge: FigureEdge) -> [FigureAction] {
+            FigureRepertoire.actions(
+                for: edge, room: metrics.travelRoom(at: edge, on: rect, viewport: viewport, from: nil)
+            )
+        }
+        var current: (id: Int, edge: FigureEdge)?
+        var previous: FigureAction?
+        var plays = 0
+        for _ in 0..<500 {
+            // A random subset of the cards is laid out each time.
+            let candidates = pool.filter { _ in Bool.random(using: &generator) }
+            let last = previous
+            guard let pick = FigureAnchorPicker.nextPlacement(
+                current: current?.id, currentEdge: current?.edge, candidates: candidates, viewport: viewport,
+                sizes: metrics.sizes,
+                offersFresh: { _, rect, edge in actions(rect, edge).contains { $0 != last } },
+                using: &generator
+            ) else { continue }
+            let rect = try #require(candidates.first { $0.id == pick.id }?.rect)
+            let action = FigureRepertoire.next(after: previous, from: actions(rect, pick.edge), using: &generator)
+            // Every place the stage could have picked.
+            let places = candidates.flatMap { candidate in
+                FigureEdge.allCases.filter {
+                    candidate.edges.contains($0.member)
+                        && FigureAnchorPicker.isEligible(rect: candidate.rect, edge: $0, viewport: viewport, sizes: metrics.sizes)
+                }.map { (id: candidate.id, rect: candidate.rect, edge: $0) }
+            }
+            if places.contains(where: { place in actions(place.rect, place.edge).contains { $0 != previous } }) {
+                #expect(action != previous)
+            }
+            if let current, places.contains(where: { $0.id != current.id || $0.edge != current.edge }) {
+                #expect(pick.id != current.id || pick.edge != current.edge)
+            }
+            current = pick
+            previous = action
+            plays += 1
+        }
+        #expect(plays > 400)
+        // Only the last action is possible: the repeat is allowed.
+        #expect(FigureRepertoire.next(after: .swing, from: [.swing], using: &generator) == .swing)
+    }
+
+    // MARK: - Sides at the screen's edge
+
+    @Test("A side at the screen's edge only climbs: a full-width card on both sides, a half-width tile on its outer side")
+    func screenEdgeSides() {
+        let metrics = PeekingFigureMetrics.standard
+        let sizes = metrics.sizes
+        #expect(sizes.screenEdgeGap == 28)
+        #expect(PeekingFigureMetrics(height: 112).screenEdgeGap == 56)
+        func actions(_ rect: CGRect, _ edge: FigureEdge) -> [FigureAction] {
+            FigureRepertoire.actions(
+                for: edge, room: metrics.travelRoom(at: edge, on: rect, viewport: viewport, from: nil),
+                atScreenEdge: FigureAnchorPicker.isAtScreenEdge(
+                    rect: rect, edge: edge, viewport: viewport, gap: sizes.screenEdgeGap
+                )
+            )
+        }
+        func ok(_ rect: CGRect, _ edge: FigureEdge) -> Bool {
+            FigureAnchorPicker.isEligible(rect: rect, edge: edge, viewport: viewport, sizes: sizes)
+        }
+        // Full width (16…384 in a 400-wide viewport): both sides climb only.
+        let full = CGRect(x: 16, y: 200, width: 368, height: 300)
+        for edge in [FigureEdge.leading, .trailing] {
+            #expect(FigureAnchorPicker.isAtScreenEdge(rect: full, edge: edge, viewport: viewport, gap: 28))
+            #expect(actions(full, edge) == [.climb])
+            #expect(ok(full, edge))
+        }
+        // A half-width tile (16…196): the outer side climbs only, the inner
+        // one (facing its neighbour) takes everything.
+        let tile = CGRect(x: 16, y: 200, width: 180, height: 300)
+        #expect(actions(tile, .leading) == [.climb])
+        #expect(actions(tile, .trailing) == FigureRepertoire.side)
+        // At the screen's edge and too short to climb: not eligible at all;
+        // the same height facing a neighbour still peeks and flags.
+        let short = CGRect(x: 16, y: 200, width: 180, height: sizes.climbMinHeight - 10)
+        #expect(!ok(short, .leading))
+        #expect(ok(short, .trailing))
+        #expect(actions(short, .trailing) == [.peek, .flag])
+        #expect(ok(CGRect(x: 16, y: 200, width: 180, height: sizes.climbMinHeight), .leading))
+        // A single card (no viewport) is never at the screen's edge.
+        #expect(!FigureAnchorPicker.isAtScreenEdge(rect: full, edge: .trailing, viewport: nil, gap: 28))
+        // Top and bottom never are.
+        #expect(!FigureAnchorPicker.isAtScreenEdge(rect: full, edge: .top, viewport: viewport, gap: 28))
     }
 }

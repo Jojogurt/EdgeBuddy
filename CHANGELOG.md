@@ -9,9 +9,20 @@ change in minor releases.
 - Top edge: the walk is replaced by a caterpillar **worm walk** (in profile,
   lying on the edge; travels exactly as far as its hands and feet carry it)
   and a new **handstand** (half a cartwheel onto the hands, a balance wobble).
-- Side edges: the **climb** happens outside the card, facing it, hand over
-  hand, and always goes up; it is only played where enough of the side is on
-  screen (~136 pt at the default height).
+- Side edges: the figure plays **beside the card**, outside its edge — the
+  card hides whatever is behind it, nothing plays over the card. It slides out
+  from behind the edge; the peek hangs out holding the edge; the **flag** is a
+  human flag (hands wide apart on the edge, upper arm straight, never
+  crossed); the **climb** faces the card, goes hand over hand and always up,
+  and is only played where enough of the side is on screen (~136 pt at the
+  default height). A side needs that edge on screen; the figure past it may be
+  cut by the screen's edge.
+- A side less than 28 pt (scaled with the figure's height) from the screen's
+  edge only climbs, and is used only where the climb fits; sides facing other
+  content keep the full repertoire. Single cards are never at the edge.
+- Never the same action twice in a row (also after rest-only plays, taps and
+  relocations), preferring a card or edge that offers something new, and
+  never the same edge of the same card twice when there is another.
 - Hands and feet on an edge are held by two-bone IK while sampling, so grips
   no longer slip or cross (hang, swing, pull-up, the bottom entrance, flag,
   climb, handstand); bent arms under the bottom edge bend outward.
