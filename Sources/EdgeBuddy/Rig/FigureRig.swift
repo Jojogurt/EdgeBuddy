@@ -1410,8 +1410,8 @@ enum FigureRepertoire {
     static let top: [FigureAction] = [.wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run]
     /// Actions hanging under the bottom edge.
     static let bottom: [FigureAction] = [.swing, .pullUp]
-    /// Actions at a side edge.
-    static let side: [FigureAction] = [.peek, .flag, .climb]
+    /// Actions at a side edge (the peek stays out: it only leans in place).
+    static let side: [FigureAction] = [.flag, .climb]
 
     /// The repertoire of `edge`.
     static func actions(for edge: FigureEdge) -> [FigureAction] {

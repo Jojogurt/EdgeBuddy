@@ -24,7 +24,7 @@ public struct FigureStyle: Equatable, Sendable {
     public var appearDelay: ClosedRange<Double>
 
     /// The default `appearDelay`, seconds.
-    public static let defaultAppearDelay: ClosedRange<Double> = 0.8...2.0
+    public static let defaultAppearDelay: ClosedRange<Double> = 1.5...3.0
 
     /// A style with the given entrance, tempo and first-entrance delay.
     ///
@@ -32,7 +32,7 @@ public struct FigureStyle: Equatable, Sendable {
     ///   - entrance: how the figure comes out; `.climb` by default.
     ///   - tempo: playback speed, 1 by default.
     ///   - appearDelay: seconds hidden before the first entrance after the
-    ///     stage appears, drawn at random from this range; 0.8…2 by default,
+    ///     stage appears, drawn at random from this range; 1.5…3 by default,
     ///     `0...0` for none.
     public init(
         entrance: FigureEntrance = .climb, tempo: Double = 1,

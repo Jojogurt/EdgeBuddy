@@ -885,8 +885,8 @@ struct PeekingFigureTests {
         }
         #expect(actions(height: sizes.climbMinHeight).contains(.climb))
         #expect(actions(height: sizes.climbMinHeight + 40).contains(.climb))
-        // Tall enough for the peek and the flag, not for the climb.
-        #expect(actions(height: sizes.climbMinHeight - 2) == [.peek, .flag])
+        // Tall enough for the flag, not for the climb.
+        #expect(actions(height: sizes.climbMinHeight - 2) == [.flag])
         #expect(FigureAnchorPicker.isEligible(
             rect: CGRect(x: 40, y: 200, width: 320, height: sizes.climbMinHeight - 2),
             edge: .trailing, viewport: viewport, sizes: sizes
@@ -962,13 +962,13 @@ struct PeekingFigureTests {
         }
     }
 
-    @Test("Appear delay: 0.8–2 s by default, scaled by tempo; 0...0 comes out at once")
+    @Test("Appear delay: 1.5–3 s by default, scaled by tempo; 0...0 comes out at once")
     func appearDelay() {
         var generator = SystemRandomNumberGenerator()
-        #expect(FigureStyle.standard.appearDelay == 0.8...2.0)
+        #expect(FigureStyle.standard.appearDelay == 1.5...3.0)
         for _ in 0..<50 {
-            #expect((0.8...2.0).contains(FigureStyle.standard.entranceDelay(using: &generator)))
-            #expect((0.4...1.0).contains(FigureStyle(tempo: 2).entranceDelay(using: &generator)))
+            #expect((1.5...3.0).contains(FigureStyle.standard.entranceDelay(using: &generator)))
+            #expect((0.75...1.5).contains(FigureStyle(tempo: 2).entranceDelay(using: &generator)))
         }
         #expect(FigureStyle(appearDelay: 0...0).entranceDelay(using: &generator) == 0)
         #expect(FigureStyle(appearDelay: 1.5...1.5).entranceDelay(using: &generator) == 1.5)
@@ -1062,11 +1062,11 @@ struct PeekingFigureTests {
         #expect(actions(tile, .leading) == [.climb])
         #expect(actions(tile, .trailing) == FigureRepertoire.side)
         // At the screen's edge and too short to climb: not eligible at all;
-        // the same height facing a neighbour still peeks and flags.
+        // the same height facing a neighbour still flags.
         let short = CGRect(x: 16, y: 200, width: 180, height: sizes.climbMinHeight - 10)
         #expect(!ok(short, .leading))
         #expect(ok(short, .trailing))
-        #expect(actions(short, .trailing) == [.peek, .flag])
+        #expect(actions(short, .trailing) == [.flag])
         #expect(ok(CGRect(x: 16, y: 200, width: 180, height: sizes.climbMinHeight), .leading))
         // A single card (no viewport) is never at the screen's edge.
         #expect(!FigureAnchorPicker.isAtScreenEdge(rect: full, edge: .trailing, viewport: nil, gap: 28))

@@ -163,7 +163,7 @@ above it (for example once at your app's root):
   the built-in policy (Reduce Motion and Low Power Mode still stop the loop).
 - **Style** — `FigureEntrance.climb` (default: grabs the edge and climbs up)
   or `.spring` (pops straight up); `tempo` scales the speed; `appearDelay`
-  (default 0.8…2 s, drawn at random, scaled by tempo) keeps it hidden for a
+  (default 1.5…3 s, drawn at random, scaled by tempo) keeps it hidden for a
   moment after the screen appears before its first entrance — `0...0` comes
   out at once. Later cycles and taps don't wait.
 

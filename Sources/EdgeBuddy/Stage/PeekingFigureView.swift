@@ -120,14 +120,13 @@ struct PeekingFigureView: View {
         .onChange(of: anchors.map(\.id)) { _, ids in
             if let anchorID, !ids.contains(anchorID) {
                 // Its card went away (another segment, out of a lazy stack):
-                // start over from behind another one.
-                startDate = nil
+                // start over from behind another one, after the same wait
+                // as a fresh appearance — the new content settles first.
                 isStill = false
-                isHidden = true
-                self.anchorID = nil
-                previousAnchorID = nil
+                isParked = false
+                isPending = false
                 playID += 1
-                if isWaiting { isPending = true } else { comeOut() }
+                appear()
             } else if isParked, !isWaiting {
                 comeOut()
             }
