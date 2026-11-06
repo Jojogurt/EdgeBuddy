@@ -361,6 +361,8 @@ struct PeekingFigureView: View {
         var generator = SystemRandomNumberGenerator()
         // Start from wherever the figure is right now (mid-walk included).
         let current = position(at: elapsed(at: .now))
+        // A tap mid-climb leaves the way the climb does, from the pose shown.
+        let shownPose = timeline.joints(at: elapsed(at: .now))
         previousSpot = current.spot
         previousAnchorID = current.anchor
         previousEdge = current.edge
@@ -423,7 +425,8 @@ struct PeekingFigureView: View {
         }
         timeline = FigureTimeline(
             action: played, entrance: entrance, reduceMotion: reduceMotion, edge: edge,
-            relocating: relocating, from: current.edge, tempo: style.tempo, variation: variation
+            relocating: relocating, from: current.edge, pose: current.edge.isSide ? shownPose : nil,
+            tempo: style.tempo, variation: variation
         )
         isHidden = false
         isStill = false

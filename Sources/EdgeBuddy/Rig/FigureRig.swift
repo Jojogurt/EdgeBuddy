@@ -260,6 +260,18 @@ extension FigureJoints {
         return copy
     }
 
+    /// The same drawing seen the other way round: `facing` negated, every
+    /// angle negated and the `L` and `R` limbs swapped, so the figure looks
+    /// exactly as before (from the front; in profile the faded far limbs
+    /// swap). Lets a turn happen in front view without squashing it flat.
+    var flippedFacing: FigureJoints {
+        with {
+            $0.armL = -armR; $0.elbowL = -elbowR; $0.armR = -armL; $0.elbowR = -elbowL
+            $0.legL = -legR; $0.kneeL = -kneeR; $0.legR = -legL; $0.kneeR = -kneeL
+            $0.lean = -lean; $0.tilt = -tilt; $0.facing = -facing
+        }
+    }
+
     /// A copy with each given hand or foot placed on its point (`placing(_:at:)`).
     func placing(
         armL l: CGPoint? = nil, armR r: CGPoint? = nil, legL fl: CGPoint? = nil, legR fr: CGPoint? = nil
@@ -451,6 +463,46 @@ enum FigureEdgePoses {
         armL: CGPoint(x: sideGripX, y: climbHandTop), armR: CGPoint(x: sideGripX, y: climbHandTop + climbReach),
         legL: CGPoint(x: climbFootX, y: climbFootBottom), legR: CGPoint(x: climbFootX, y: climbFootBottom - climbReach)
     )
+    /// Where the climb's hands hold the edge in `climbA`.
+    static let climbGripLow = CGPoint(x: sideGripX, y: climbHandTop + climbReach)
+    static let climbGripHigh = CGPoint(x: sideGripX, y: climbHandTop)
+    /// Behind the card, already turned to it as on the climb: `climbA`
+    /// moved left until nothing shows past the edge.
+    static let climbHidden = climbA.with { $0.x = 36 }
+    /// The first hand around the edge: the low grip, the body still behind.
+    static let climbReachLow = climbHidden.placing(armL: climbGripLow)
+    /// Then the other hand higher up.
+    static let climbReachHigh = climbReachLow.placing(armR: climbGripHigh)
+    /// Swinging out on both hands, legs trailing, feet not on the edge yet.
+    static let climbSwingOut = climbBody.with {
+        $0.x = 52; $0.lean = 14; $0.legL = 20; $0.kneeL = -50; $0.legR = -5; $0.kneeR = -30
+    }.placing(armL: climbGripLow, armR: climbGripHigh)
+    /// The climb's entrance from `climbHidden`: one hand grips the edge,
+    /// the other higher, the body swings out on them and the feet find the
+    /// edge — `climbA`. Facing the card all the way (no turn).
+    static let climbEntranceSteps: [FigureTimeline.Step] = [
+        .init(duration: 0.24, joints: climbReachLow, easing: .out),
+        .init(duration: 0.2, joints: climbReachHigh, limbs: LimbPaths(armL: .held)),
+        .init(duration: 0.32, joints: climbSwingOut, limbs: .hands),
+        .init(duration: 0.26, joints: climbA, limbs: .hands),
+    ]
+    /// The entrance backwards, from `climbA`: the body swings back in
+    /// behind the card, then the hands let go, the upper one first.
+    static let climbExitSteps: [FigureTimeline.Step] = FigureTimeline.reversed(climbEntranceSteps, from: climbHidden)
+    /// From the peek to `climbA` without squashing the figure flat: the
+    /// same peek seen the other way round (`flippedFacing`, an invisible
+    /// switch), then a turn into profile; the edge hand slides up the edge
+    /// to the high grip.
+    static let climbTurnIn: [FigureTimeline.Step] = [
+        .init(duration: 0, joints: peek.flippedFacing),
+        .init(duration: 0.42, joints: climbA, limbs: LimbPaths(armR: .held)),
+    ]
+    /// Back from `climbA` to the peek, the same way.
+    static let climbTurnOut: [FigureTimeline.Step] = [
+        .init(duration: 0.42, joints: peek.flippedFacing, limbs: LimbPaths(armR: .held)),
+        .init(duration: 0, joints: peek),
+    ]
+
     /// From `climbA` to `climbB`: the high hand and foot hold on (sliding
     /// down the grid as the figure rises), the low ones reach up, off the edge.
     static let climbFromA = LimbPaths(armL: .lifted(5, 0), armR: .held, legL: .held, legR: .lifted(6, 0))
@@ -655,11 +707,14 @@ struct FigureTimeline: Equatable, Sendable {
     ///   - relocating: duck behind the card first, then come out elsewhere
     ///     (`relocatesAt`) with `entrance` (spring when nil) and play.
     ///   - previousEdge: the edge it ducks from when relocating (default `edge`).
+    ///   - previousPose: the pose it ducks from when relocating (default the
+    ///     previous edge's rest); a climbing pose at a side leaves the way the
+    ///     climb does (`FigureEdgePoses.climbExitSteps`).
     ///   - tempo: playback speed (`FigureStyle.tempo`); every time scales by 1/tempo.
     ///   - variation: holds, repeat count and exit of a looped cycle.
     init(
         action: FigureAction, entrance: FigureEntrance?, reduceMotion: Bool, edge: FigureEdge = .top,
-        relocating: Bool = false, from previousEdge: FigureEdge? = nil,
+        relocating: Bool = false, from previousEdge: FigureEdge? = nil, pose previousPose: FigureJoints? = nil,
         tempo: Double = 1, variation: FigureVariation = .standard
     ) {
         let pace = max(tempo * variation.tempoScale, 0.1)
@@ -694,16 +749,28 @@ struct FigureTimeline: Equatable, Sendable {
         }
 
         let comesOut = relocating ? (entrance ?? .spring) : entrance
-        let hidden = comesOut.map { Self.hiddenPose($0, edge: edge) } ?? rest
-        func hold(_ seconds: Double) {
+        // A side climb comes out and goes back in its own way: in profile,
+        // facing the card, hands first — no peek, no turn.
+        let climbing = edge.isSide && action == .climb
+        let hidden = comesOut.map { climbing ? poses.climbHidden : Self.hiddenPose($0, edge: edge) } ?? rest
+        // The pose the holds around the action keep.
+        let settled = climbing && (comesOut != nil || variation.exit != nil) ? poses.climbA : rest
+        func hold(_ seconds: Double, _ pose: FigureJoints) {
             guard seconds > 0 else { return }
             time += seconds
-            frames.append(Keyframe(time: time, joints: rest, easing: .inOut))
+            frames.append(Keyframe(time: time, joints: pose, easing: .inOut))
         }
         if relocating {
             let before = previousEdge ?? edge
-            frames.append(Keyframe(time: 0, joints: Self.restPose(before), easing: .inOut))
-            at(Self.duckDuration, Self.duckPose(before), .in, limbs: before == .bottom ? FigureEdgePoses.hangGrips : .none)
+            let start = previousPose ?? Self.restPose(before)
+            frames.append(Keyframe(time: 0, joints: start, easing: .inOut))
+            if before.isSide, start.profile > 0.5 {
+                // Mid-climb: back around the edge, hands last — quicker than
+                // the climb's own exit.
+                for step in poses.climbExitSteps { at(step.duration * 0.6, step.joints, step.easing, limbs: step.limbs) }
+            } else {
+                at(Self.duckDuration, Self.duckPose(before), .in, limbs: before == .bottom ? FigureEdgePoses.hangGrips : .none)
+            }
             relocatesAt = time
             // Jump straight to the new edge's hidden pose: poses of one edge
             // may show at another.
@@ -713,8 +780,8 @@ struct FigureTimeline: Equatable, Sendable {
             frames.append(Keyframe(time: 0, joints: hidden, easing: .inOut))
             relocatesAt = nil
         }
-        if let comesOut { play(Self.entranceSteps(comesOut, edge: edge)) }
-        hold(variation.holdBefore)
+        if let comesOut { play(climbing ? poses.climbEntranceSteps : Self.entranceSteps(comesOut, edge: edge)) }
+        hold(variation.holdBefore, comesOut != nil ? settled : rest)
 
         switch action {
         case .rest:
@@ -767,14 +834,15 @@ struct FigureTimeline: Equatable, Sendable {
             at(0.35, poses.flagSwing, limbs: .hands)
             at(0.42, rest, limbs: .hands)
         case .climb:
-            // Turn to the card, climb hand over hand (each half-cycle rises
-            // one reach), turn back to the peek.
-            at(0.42, poses.climbA)
+            // Out already (the climb's own entrance), or turn from the peek
+            // to the card; climb hand over hand (each half-cycle rises one
+            // reach); leave the climb's own way (the exit), or turn back.
+            if !(climbing && comesOut != nil) { play(poses.climbTurnIn) }
             for _ in 0..<repeats {
                 at(0.36, poses.climbB, limbs: poses.climbFromA, travel: poses.climbReach)
                 at(0.36, poses.climbA, limbs: poses.climbFromB, travel: poses.climbReach)
             }
-            at(0.42, rest)
+            if !(climbing && variation.exit != nil) { play(poses.climbTurnOut) }
         case .wave:
             let up = rest.with {
                 $0.armL = -8; $0.elbowL = 4; $0.armR = 148; $0.elbowR = -18; $0.tilt = -7
@@ -890,8 +958,8 @@ struct FigureTimeline: Equatable, Sendable {
             at(0.3, rest)
         }
         if let exit = variation.exit {
-            hold(variation.holdAfter)
-            play(Self.exitSteps(exit, edge: edge))
+            hold(variation.holdAfter, settled)
+            play(climbing ? poses.climbExitSteps : Self.exitSteps(exit, edge: edge))
             hiddenPause = variation.hiddenPause
         } else {
             hiddenPause = nil
@@ -973,8 +1041,13 @@ struct FigureTimeline: Equatable, Sendable {
     /// The entrance played backwards: from rest down to `hiddenPose(entrance)`,
     /// each segment with the same length, limbs and the reversed easing.
     static func exitSteps(_ entrance: FigureEntrance, edge: FigureEdge = .top) -> [Step] {
-        let steps = entranceSteps(entrance, edge: edge)
-        let poses = [hiddenPose(entrance, edge: edge)] + steps.map(\.joints)
+        reversed(entranceSteps(entrance, edge: edge), from: hiddenPose(entrance, edge: edge))
+    }
+
+    /// `steps` (which start at `start`) played backwards, ending at `start`:
+    /// each segment with the same length, limbs and the reversed easing.
+    static func reversed(_ steps: [Step], from start: FigureJoints) -> [Step] {
+        let poses = [start] + steps.map(\.joints)
         return steps.indices.reversed().map { i in
             Step(duration: steps[i].duration, joints: poses[i], easing: steps[i].easing.reversed, limbs: steps[i].limbs)
         }

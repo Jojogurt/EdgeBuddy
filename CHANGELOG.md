@@ -17,6 +17,11 @@ change in minor releases.
   and is only played where enough of the side is on screen (~136 pt at the
   default height). A side needs that edge on screen; the figure past it may be
   cut by the screen's edge.
+- The side climb comes out and goes back on its own: from behind the card a
+  hand grips the edge, then the other higher, the body swings out already in
+  profile facing the card and the feet find the edge; it leaves the same way
+  backwards (body in first, hands let go last), also when tapped mid-climb.
+  Turns between the peek and the climb no longer squash the figure flat.
 - A side less than 28 pt (scaled with the figure's height) from the screen's
   edge only climbs, and is used only where the climb fits; sides facing other
   content keep the full repertoire. Single cards are never at the edge.

@@ -1073,4 +1073,98 @@ struct PeekingFigureTests {
         // Top and bottom never are.
         #expect(!FigureAnchorPicker.isAtScreenEdge(rect: full, edge: .top, viewport: viewport, gap: 28))
     }
+
+    // MARK: - Climb entrance and exit
+
+    /// No frame turns the figure by squashing it flat (facing through 0).
+    private func neverSquashed(_ timeline: FigureTimeline) {
+        for time in samples(timeline) {
+            let joints = timeline.joints(at: time)
+            #expect(abs(joints.facing) > 0.99, "facing \(joints.facing) at \(time)")
+        }
+    }
+
+    @Test("Flipped facing draws the same figure")
+    func flippedFacing() {
+        for pose in [FigureEdgePoses.peek, FigureEdgePoses.peekOut, FigureJoints.rest] {
+            let a = FigureSkeleton(pose), b = FigureSkeleton(pose.flippedFacing)
+            #expect(distance(a.head, b.head) < 1e-6 && distance(a.torsoTop, b.torsoTop) < 1e-6)
+            for i in 0..<3 {
+                #expect(distance(a.armL[i], b.armR[i]) < 1e-6 && distance(a.armR[i], b.armL[i]) < 1e-6)
+                #expect(distance(a.legL[i], b.legR[i]) < 1e-6 && distance(a.legR[i], b.legL[i]) < 1e-6)
+            }
+        }
+    }
+
+    @Test("Climb entrance: from behind the card, hands first, out in profile facing the card — no turn, no peek")
+    func climbEntrance() throws {
+        var variation = FigureVariation(repeats: 2)
+        variation.exit = .climb
+        variation.hiddenPause = 1
+        let climb = FigureTimeline(action: .climb, entrance: .climb, reduceMotion: false, edge: .trailing, variation: variation)
+        // Starts and ends fully behind the card.
+        #expect(climb.keyframes[0].joints == FigureEdgePoses.climbHidden)
+        #expect(climb.final == FigureEdgePoses.climbHidden)
+        #expect(extent(FigureEdgePoses.climbHidden).maxX < FigureEdgePoses.sideMaskX)
+        #expect(FigureEdgePoses.climbHidden.profile == 1 && FigureEdgePoses.climbHidden.facing == -1)
+        // The entrance lands in `climbA`, never through the peek.
+        let entered = FigureEdgePoses.climbEntranceSteps.map(\.duration).reduce(0, +)
+        #expect(climb.keyframes.contains { abs($0.time - entered) < 1e-9 && $0.joints == FigureEdgePoses.climbA })
+        #expect(!climb.keyframes.contains { $0.joints == FigureEdgePoses.peek })
+        // Hands: the low one grips first, then the high one.
+        let low = FigureSkeleton(FigureEdgePoses.climbReachLow)
+        #expect(distance(low.armL[2], FigureEdgePoses.climbGripLow) < 1e-6)
+        #expect(low.armR[2].x < FigureEdgePoses.sideMaskX)
+        let high = FigureSkeleton(FigureEdgePoses.climbReachHigh)
+        #expect(distance(high.armR[2], FigureEdgePoses.climbGripHigh) < 1e-6)
+        // Gripping hands hold while the body swings out and back in.
+        for time in samples(climb) {
+            guard let (a, b) = segment(climb, at: time), b.travel == 0 else { continue }
+            let s = FigureSkeleton(climb.joints(at: time))
+            for limb in FigureLimb.allCases where b.limbs[limb] == .held {
+                let start = FigureSkeleton(a.joints).end(of: limb)
+                guard distance(start, FigureSkeleton(b.joints).end(of: limb)) < 0.6 else { continue }
+                #expect(distance(s.end(of: limb), start) < 0.6, "\(limb) at \(time)")
+            }
+        }
+        neverSquashed(climb)
+        // Still goes up.
+        #expect(try #require(climb.walkDistance) > 0)
+    }
+
+    @Test("Climb without entrance or exit turns from and back to the peek without squashing")
+    func climbTurns() {
+        let climb = FigureTimeline(action: .climb, entrance: nil, reduceMotion: false, edge: .trailing)
+        #expect(climb.keyframes[0].joints == FigureEdgePoses.peek)
+        #expect(climb.final == FigureEdgePoses.peek)
+        neverSquashed(climb)
+        // The turn's flipped peek is the peek, drawn the same.
+        #expect(distance(
+            FigureSkeleton(FigureEdgePoses.peek.flippedFacing).armR[2], FigureEdgePoses.peekGrip
+        ) < 1e-6)
+        // Coming out at the start, staying out at the end.
+        let out = FigureTimeline(action: .climb, entrance: .climb, reduceMotion: false, edge: .trailing)
+        #expect(out.keyframes[0].joints == FigureEdgePoses.climbHidden)
+        #expect(out.final == FigureEdgePoses.peek)
+        neverSquashed(out)
+    }
+
+    @Test("A tap mid-climb leaves around the edge in profile, hidden at the jump")
+    func climbRelocation() throws {
+        let timeline = FigureTimeline(
+            action: .peek, entrance: .climb, reduceMotion: false, edge: .leading,
+            relocating: true, from: .trailing, pose: FigureEdgePoses.climbB
+        )
+        let jump = try #require(timeline.relocatesAt)
+        #expect(timeline.joints(at: 0) == FigureEdgePoses.climbB)
+        #expect(timeline.keyframes.contains { abs($0.time - jump) < 1e-9 && $0.joints == FigureEdgePoses.climbHidden })
+        for time in samples(timeline) where time <= jump { #expect(abs(timeline.joints(at: time).facing) > 0.99) }
+        // Not climbing: the usual duck.
+        let peek = FigureTimeline(
+            action: .peek, entrance: .climb, reduceMotion: false, edge: .leading,
+            relocating: true, from: .trailing, pose: FigureEdgePoses.peek
+        )
+        #expect(abs(try #require(peek.relocatesAt) - FigureTimeline.duckDuration) < 1e-9)
+    }
 }
+

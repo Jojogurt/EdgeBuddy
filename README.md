@@ -14,7 +14,7 @@ somewhere else:
 - **leading / trailing edge** — slides out from behind the card and plays
   beside it, outside its edge, holding on: hangs out and looks around, does a
   human flag (hands wide apart on the edge, body held out flat), climbs up the
-  edge hand over hand (only where enough of the side is on screen). Nothing
+  edge hand over hand (it comes out hands first, already facing the card) (only where enough of the side is on screen). Nothing
   plays over the card. A side less than ~28 pt from the screen's edge (a
   full-width card, the outer side of a tile) has no room beside it and only
   climbs there — the figure may be cut by the screen's edge; a side facing
