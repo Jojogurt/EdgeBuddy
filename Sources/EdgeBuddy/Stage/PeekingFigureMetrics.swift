@@ -59,11 +59,55 @@ struct PeekingFigureMetrics: Equatable, Sendable {
 
     /// What an anchor needs at each edge.
     var sizes: FigureSizes {
-        FigureSizes(
+        let side = size(for: .trailing).height + 2 * sideMargin
+        return FigureSizes(
             figureHeight: height, minWidth: minimumAnchorWidth,
             hangHeight: size(for: .bottom).height,
-            sideMinHeight: size(for: .trailing).height + 2 * sideMargin
+            sideMinHeight: side,
+            climbMinHeight: (side + (FigureTimeline.minimumTravel(.climb) ?? 0) * scale).rounded(.up)
         )
+    }
+
+    /// Points the box moves along `edge` of `rect` between the spots 0 and
+    /// 1 (`FigurePlacement`): the free width (top, bottom) or height (sides).
+    func travelSpan(at edge: FigureEdge, on rect: CGRect) -> CGFloat {
+        let size = size(for: edge)
+        return edge.isSide
+            ? max(0, rect.height - 2 * sideMargin - size.height)
+            : max(0, rect.width - 2 * edgeMargin - size.width)
+    }
+
+    /// Spots along a side whose box is on screen in `viewport` (the card may
+    /// reach past it); the whole edge for top and bottom.
+    func spotRange(at edge: FigureEdge, on rect: CGRect, viewport: CGRect?) -> ClosedRange<Double> {
+        guard edge.isSide, let viewport else { return 0...1 }
+        let free = travelSpan(at: edge, on: rect)
+        guard free > 0 else { return 0...1 }
+        let height = size(for: edge).height
+        let track = FigureAnchorPicker.sideTrack(rect: rect, viewport: viewport)
+        let low = (track.lowerBound - rect.minY) / free
+        let high = (track.upperBound - sideMargin - height - sideMargin - rect.minY) / free
+        let lower = min(max(Double(low), 0), 1)
+        return lower...max(lower, min(max(Double(high), 0), 1))
+    }
+
+    /// Grid units the figure can travel along `edge` of `rect` — up a side
+    /// (its box staying on screen), along the top either way — from `spot`,
+    /// or, when nil (it pops up anew and picks its spot), from the best spot:
+    /// the lowest on a side, any on the top (at least half the width lies
+    /// one way). Zero at the bottom: nothing travels there.
+    func travelRoom(at edge: FigureEdge, on rect: CGRect, viewport: CGRect?, from spot: Double?) -> Double {
+        let span = Double(travelSpan(at: edge, on: rect) / scale)
+        switch edge {
+        case .bottom:
+            return 0
+        case .top:
+            guard let spot else { return span / 2 }
+            return span * max(spot, 1 - spot)
+        case .leading, .trailing:
+            let range = spotRange(at: edge, on: rect, viewport: viewport)
+            return span * max(0, (spot ?? range.upperBound) - range.lowerBound)
+        }
     }
 
     /// Hidden at accessibility text sizes, where it would cover too much of

@@ -41,6 +41,11 @@ struct PeekingFigureView: View {
     @State private var isParked = false
     /// The pose holds still — the animation clock stops (`stillWindows`).
     @State private var isStill = false
+    /// Waiting out `FigureStyle.appearDelay` before the first entrance.
+    @State private var isDelayingEntrance = false
+    @State private var entranceDelay = 0.0
+    /// Restarts the entrance-delay task.
+    @State private var delayID = 0
     /// The anchor it stands on (`anchorID`) and the one it stood on until it
     /// ducked mid-relocation (`previousAnchorID`).
     @State private var anchorID: AnyHashable?
@@ -65,18 +70,27 @@ struct PeekingFigureView: View {
             if let rect = place.anchor.flatMap(rect(for:)) {
                 let pose = joints(at: elapsed, edge: place.edge)
                 let frame = figureFrame(at: place.edge, spot: place.spot, on: rect)
-                FigureCanvas(joints: pose, color: color, viewBox: PeekingFigureMetrics.box(for: place.edge))
+                // Sides draw one more box width past the card's edge, shown
+                // only while the flag sticks out there.
+                let outside = place.edge.isSide ? frame.width : 0
+                let shown = (frame.width + outside * timeline.outsideRevealFraction(at: elapsed)) / (frame.width + outside)
+                let box = PeekingFigureMetrics.box(for: place.edge)
+                FigureCanvas(
+                    joints: pose, color: color,
+                    viewBox: CGRect(x: box.minX, y: box.minY, width: box.width * (frame.width + outside) / frame.width, height: box.height)
+                )
                     .opacity(timeline.opacity(at: elapsed))
-                    .frame(width: frame.width, height: frame.height)
-                    .clipped()
-                    // Sides are drawn at the trailing edge; leading mirrors it.
+                    .frame(width: frame.width + outside, height: frame.height)
+                    .clipShape(LeadingFraction(fraction: shown))
+                    .contentShape(LeadingFraction(fraction: shown))
+                    // Sides are drawn at the trailing edge; leading mirrors it
+                    // (around the card's edge, the drawn box's middle).
                     .scaleEffect(x: place.edge == .leading ? -1 : 1, y: 1)
-                    .contentShape(.rect)
                     .onTapGesture { tapped() }
                     // Only the figure itself takes taps, and only once it is
                     // out — never the content it covers.
                     .allowsHitTesting(Self.isOut(pose, at: place.edge))
-                    .position(x: frame.midX, y: frame.midY)
+                    .position(x: drawnMidX(frame, edge: place.edge, on: rect), y: frame.midY)
             }
         }
         .accessibilityHidden(true)
@@ -89,8 +103,18 @@ struct PeekingFigureView: View {
             isHidden = true
             isParked = false
             isStill = false
+            isDelayingEntrance = false
             anchorID = nil
             previousAnchorID = nil
+        }
+        .task(id: delayID) {
+            // The first entrance after appearing waits a moment (cancelled
+            // with the view, or restarted by the next appearance).
+            guard isDelayingEntrance else { return }
+            try? await Task.sleep(for: .seconds(entranceDelay))
+            guard !Task.isCancelled, isDelayingEntrance else { return }
+            isDelayingEntrance = false
+            enter()
         }
         .onChange(of: isWaiting) { _, waiting in
             if !waiting, isPending {
@@ -200,19 +224,19 @@ struct PeekingFigureView: View {
         }
     }
 
-    /// Spots along a side whose box is on screen right now (the card may
-    /// reach past the viewport); the whole edge for top and bottom.
+    /// Middle of the drawn box: the logical box (`figureFrame`) plus, at a
+    /// side, one more width past the card's edge — so the middle is the edge.
+    private func drawnMidX(_ frame: CGRect, edge: FigureEdge, on rect: CGRect) -> CGFloat {
+        switch edge {
+        case .top, .bottom: frame.midX
+        case .trailing: rect.maxX
+        case .leading: rect.minX
+        }
+    }
+
+    /// Spots along `edge` of `rect` whose box is on screen right now.
     private func spotRange(at edge: FigureEdge, on rect: CGRect) -> ClosedRange<Double> {
-        guard edge.isSide, let viewport else { return 0...1 }
-        let height = metrics.size(for: edge).height
-        let margin = metrics.sideMargin
-        let free = rect.height - 2 * margin - height
-        guard free > 0 else { return 0...1 }
-        let track = FigureAnchorPicker.sideTrack(rect: rect, viewport: viewport)
-        let low = (track.lowerBound - rect.minY) / free
-        let high = (track.upperBound - margin - height - margin - rect.minY) / free
-        let lower = min(max(Double(low), 0), 1)
-        return lower...max(lower, min(max(Double(high), 0), 1))
+        metrics.spotRange(at: edge, on: rect, viewport: viewport)
     }
 
     /// Some of the figure's box is in the visible area — else the clock stops.
@@ -248,7 +272,10 @@ struct PeekingFigureView: View {
             joints.lean += (walkTarget > spot ? 5 : -5) * sin(progress * .pi)
         }
         if walkTarget < spot {
+            // Mirrored around the box's middle, not the hip: poses off the
+            // middle (the worm) stay inside the box.
             joints.facing = 1 - 2 * joints.profile
+            joints.x *= joints.facing
         }
         return joints
     }
@@ -285,6 +312,20 @@ struct PeekingFigureView: View {
         isHidden = true
         anchorID = nil
         previousAnchorID = nil
+        var generator = SystemRandomNumberGenerator()
+        entranceDelay = style.entranceDelay(using: &generator)
+        if entranceDelay > 0 {
+            // Stay hidden a moment; `enter()` runs from the delay task.
+            isDelayingEntrance = true
+            delayID += 1
+        } else {
+            isDelayingEntrance = false
+            enter()
+        }
+    }
+
+    /// The first entrance after appearing (once `appearDelay` is over).
+    private func enter() {
         if isWaiting {
             // Come out and rest; the cycle carries on after the celebration.
             comeOut(action: .rest)
@@ -302,8 +343,9 @@ struct PeekingFigureView: View {
     /// From behind the cards: out from behind a visible anchor — or wait
     /// (`isParked`) while scrolling or when none is fully on screen.
     private func comeOut(action override: FigureAction? = nil) {
-        // Already out (two triggers in one update): nothing to do.
-        guard isHidden else { return }
+        // Already out (two triggers in one update), or still waiting out the
+        // first entrance's delay: nothing to do.
+        guard isHidden, !isDelayingEntrance else { return }
         guard !isScrolling || !hasPlayed, pick(excluding: anchorID) != nil else {
             isParked = true
             return
@@ -326,6 +368,13 @@ struct PeekingFigureView: View {
             anchorID = next?.id ?? current.anchor
             edge = next?.edge ?? (allowedEdges.contains(current.edge.member) ? current.edge : .top)
         }
+        let rect = anchorID.flatMap(rect(for:))
+        let range = rect.map { spotRange(at: edge, on: $0) } ?? 0...1
+        // Room to travel along the edge: a climb needs a tall enough side on
+        // screen, a worm walk a wide enough top.
+        let room = rect.map {
+            metrics.travelRoom(at: edge, on: $0, viewport: viewport, from: popsUp ? nil : current.spot)
+        } ?? 0
         // Low Power Mode: no action, only the rest pose (and its entrance).
         let played: FigureAction
         if ProcessInfo.processInfo.isLowPowerModeEnabled {
@@ -333,21 +382,21 @@ struct PeekingFigureView: View {
         } else if let override {
             played = override
         } else {
-            played = FigureRepertoire.next(after: lastAction, from: FigureRepertoire.actions(for: edge), using: &generator)
+            played = FigureRepertoire.next(
+                after: lastAction, from: FigureRepertoire.actions(for: edge, room: room), using: &generator
+            )
             lastAction = played
         }
-        let variation = canLoop && override == nil
-            ? FigureVariation.random(for: played, exit: style.entrance, using: &generator)
-            : .standard
-        timeline = FigureTimeline(
-            action: played, entrance: entrance, reduceMotion: reduceMotion, edge: edge,
-            relocating: relocating, from: current.edge, tempo: style.tempo, variation: variation
-        )
-        let range = anchorID.flatMap(rect(for:)).map { spotRange(at: edge, on: $0) } ?? 0...1
+        let span = rect.map { metrics.travelSpan(at: edge, on: $0) } ?? 0
         if popsUp {
             if played == .climb {
-                // Low on the side, so the climb goes up.
-                spot = Double.random(in: (range.lowerBound + (range.upperBound - range.lowerBound) * 0.55)...range.upperBound, using: &generator)
+                // Low on the side, so the climb goes up; a little higher only
+                // when the side has room to spare.
+                let climb = FigureTimeline.travel(.climb, repeats: FigureTimeline.canvasRepeats(.climb)) ?? 0
+                let spare = range.upperBound - FigurePlacement.travelTarget(
+                    from: range.upperBound, distance: max(0, room - climb), direction: -1, scale: metrics.scale, span: span
+                )
+                spot = range.upperBound - Double.random(in: 0...(spare / 2), using: &generator)
             } else if anchorID == current.anchor, edge == current.edge {
                 spot = FigurePlacement.next(from: current.spot, using: &generator)
             } else {
@@ -357,12 +406,30 @@ struct PeekingFigureView: View {
             spot = current.spot
         }
         spot = min(max(spot, range.lowerBound), range.upperBound)
+        var variation = canLoop && override == nil
+            ? FigureVariation.random(for: played, exit: style.entrance, using: &generator)
+            : .standard
+        // Travelling actions: as many beats as fit from this spot (the top
+        // walks toward the wider side).
+        let forward = edge == .top && spot > 0.5 ? -1.0 : 1.0
+        if let beat = FigureTimeline.travel(played, repeats: 1) {
+            let fromSpot = rect.map { metrics.travelRoom(at: edge, on: $0, viewport: viewport, from: spot) } ?? 0
+            let wanted = variation.repeats ?? FigureTimeline.canvasRepeats(played)
+            variation.repeats = max(1, min(wanted, Int((fromSpot + 1e-9) / beat)))
+        }
+        timeline = FigureTimeline(
+            action: played, entrance: entrance, reduceMotion: reduceMotion, edge: edge,
+            relocating: relocating, from: current.edge, tempo: style.tempo, variation: variation
+        )
         isHidden = false
         isStill = false
-        if timeline.walkWindow == nil {
+        if let distance = timeline.walkDistance {
+            // Exactly as far as the limbs carry it: up a side, along the top.
+            walkTarget = FigurePlacement.travelTarget(
+                from: spot, distance: distance, direction: edge.isSide ? -1 : forward, scale: metrics.scale, span: span
+            )
+        } else if timeline.walkWindow == nil {
             walkTarget = spot
-        } else if played == .climb {
-            walkTarget = Double.random(in: range.lowerBound...max(range.lowerBound, spot - 0.35), using: &generator)
         } else {
             walkTarget = FigurePlacement.next(from: spot, using: &generator)
         }
@@ -372,3 +439,12 @@ struct PeekingFigureView: View {
     }
 }
 
+
+/// The leading `fraction` of a view's width — the side figure's visible part.
+private struct LeadingFraction: Shape {
+    var fraction: Double
+
+    func path(in rect: CGRect) -> Path {
+        Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width * min(max(fraction, 0), 1), height: rect.height))
+    }
+}

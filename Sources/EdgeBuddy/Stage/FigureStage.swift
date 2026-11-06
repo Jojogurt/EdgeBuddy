@@ -53,12 +53,12 @@ extension View {
     /// between the bars. Decoration only — hidden from VoiceOver and at
     /// accessibility text sizes.
     ///
-    /// Tune it with `figureColor(_:)`, `figureHeight(_:)`,
+    /// Tune it with `figureColor(_:)`, `figureOpacity(_:)`, `figureHeight(_:)`,
     /// `figureHaptics(_:)` and `figureMotionEnabled(_:)`.
     ///
     /// - Parameters:
     ///   - isEnabled: false = no figure.
-    ///   - style: entrance and tempo.
+    ///   - style: entrance, tempo and the first entrance's delay.
     ///   - isWaiting: true while something else holds the stage (say a
     ///     celebration); the figure stays where it is (or behind its card)
     ///     and carries on once it ends.
@@ -83,7 +83,7 @@ extension View {
     ///
     /// - Parameters:
     ///   - isEnabled: false = no figure.
-    ///   - style: entrance and tempo.
+    ///   - style: entrance, tempo and the first entrance's delay.
     ///   - isWaiting: true while something else holds the stage; the figure
     ///     waits and carries on once it ends.
     ///   - loops: true = it never settles (only while idle motion is
@@ -123,6 +123,7 @@ private struct FigureStageModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.figureColor) private var color
+    @Environment(\.figureOpacity) private var opacity
     @Environment(\.figureHeight) private var height
     @Environment(\.figureHapticsEnabled) private var hapticsEnabled
     @Environment(\.figureMotionOverride) private var motionOverride
@@ -160,6 +161,7 @@ private struct FigureStageModifier: ViewModifier {
                             onTap: { tapTick += 1 }
                         )
                     }
+                    .opacity(opacity)
                     // Bounded: never over the bars. Unbounded: stands above the card.
                     .clipShape(Rectangle().inset(by: isBounded ? 0 : -10_000))
                 }

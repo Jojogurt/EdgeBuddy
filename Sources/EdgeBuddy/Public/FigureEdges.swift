@@ -1,6 +1,6 @@
 /// Edges of an anchor (`figureAnchor(_:edges:)`) the figure may come out
 /// at. The stage draws an edge among the allowed ones that fit and are on
-/// screen, weighted: top 60%, bottom 20%, each side 10% (renormalized over
+/// screen, evenly: 25% each (renormalized over
 /// the edges that are possible right now).
 public struct FigureEdges: OptionSet, Hashable, Sendable {
     /// The raw bit mask.

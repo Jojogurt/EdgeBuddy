@@ -5,6 +5,8 @@ extension EnvironmentValues {
     @Entry var figureColor: Color = .accentColor
     /// Height of the figure above a top edge, points (`figureHeight(_:)`).
     @Entry var figureHeight: CGFloat = PeekingFigureMetrics.defaultHeight
+    /// Opacity of the figure (`figureOpacity(_:)`).
+    @Entry var figureOpacity: Double = 1
     /// Selection haptic on tap (`figureHaptics(_:)`).
     @Entry var figureHapticsEnabled: Bool = true
     /// The app's idle-motion decision; nil = the built-in policy
@@ -22,6 +24,14 @@ extension View {
     /// - Parameter color: the figure's colour.
     public func figureColor(_ color: Color) -> some View {
         environment(\.figureColor, color)
+    }
+
+    /// Sets the opacity of every figure in this view hierarchy, 0…1 —
+    /// say 0.8 to let it sit a little softer on the cards. Defaults to 1.
+    ///
+    /// - Parameter opacity: the figure's opacity, clamped to 0…1.
+    public func figureOpacity(_ opacity: Double) -> some View {
+        environment(\.figureOpacity, min(max(opacity, 0), 1))
     }
 
     /// Sets the figure's size for this view hierarchy: its height above a

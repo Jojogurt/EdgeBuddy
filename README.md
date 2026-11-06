@@ -7,10 +7,13 @@ behind a card you mark, plays a short random action, goes back and comes out
 somewhere else:
 
 - **top edge** — stands on it: rests, waves, does jumping jacks, stretches,
-  marches, walks or runs along the edge;
-- **bottom edge** — hangs under it: swings like a pendulum, pulls itself up;
-- **leading / trailing edge** — peeks around it, holds itself out like a flag,
-  climbs along it.
+  marches, inches along it like a caterpillar (worm walk), cartwheels into a
+  handstand or runs along the edge;
+- **bottom edge** — hangs under it (wide grip): swings like a pendulum, pulls
+  itself up;
+- **leading / trailing edge** — peeks around it, holds itself out past it like
+  a flag, climbs up its outside hand over hand (only where enough of the side
+  is on screen).
 
 A tap sends it to another card. It rides along while the content scrolls and
 waits for the scroll to stop before coming out again.
@@ -112,16 +115,19 @@ pass `isWaiting: true`; the figure stays where it is and carries on afterwards:
 `figureAnchor(_:edges:)` takes a `FigureEdges` set: `.top` (default),
 `.bottom`, `.leading`, `.trailing` or `.all`. Each cycle the stage picks a
 random anchor that is fully on screen (never the same one twice in a row when
-there is another), then an edge of it, weighted:
+there is another), then an edge of it, evenly:
 
 | Edge | Weight | Needs |
 |---|---|---|
-| top | 60 % | ~108 pt wide; room above the card on screen |
-| bottom | 20 % | ~108 pt wide; room under the card on screen |
-| leading / trailing | 10 % each | ~82 pt of the card's height on screen |
+| top | 25 % | ~108 pt wide; room above the card on screen |
+| bottom | 25 % | ~108 pt wide; room under the card on screen |
+| leading / trailing | 25 % each | ~82 pt of the card's height on screen |
 
-Weights are renormalized over the edges that are possible right now. Sizes
-scale with `figureHeight(_:)`.
+Weights are renormalized over the edges that are possible right now. Some
+actions need more room: the climb needs ~136 pt of the side on screen (it
+climbs at least ~54 pt), the worm walk ~33 pt of free width on one side of
+it; elsewhere the edge simply plays its other actions. Sizes scale with
+`figureHeight(_:)`.
 
 ## Customization
 
@@ -129,14 +135,17 @@ All settings are environment values — set them on the stage or anywhere
 above it (for example once at your app's root):
 
 ```swift
-.figureStage(style: FigureStyle(entrance: .spring, tempo: 1.2))
+.figureStage(style: FigureStyle(entrance: .spring, tempo: 1.2, appearDelay: 0.8...2))
 .figureColor(.accentColor)      // single colour; dynamic colours follow dark mode
+.figureOpacity(0.8)             // softer on the cards; 1 by default
 .figureHeight(56)               // points; everything else scales from it
 .figureHaptics(true)            // selection haptic on tap
 .figureMotionEnabled(nil)       // nil = built-in policy, or your app's own Bool
 ```
 
 - **Colour** — default `Color.accentColor`.
+- **Opacity** — `figureOpacity(_:)`, 0…1, default 1 (say 0.8 to sit softer
+  on the cards).
 - **Size** — default 56 pt (the height above a top edge). Width, margins and
   the footprint at the other edges scale with it.
 - **Haptics** — `.sensoryFeedback(.selection)` on tap, on by default.
@@ -145,7 +154,10 @@ above it (for example once at your app's root):
   own idle-motion setting, pass it with `figureMotionEnabled(_:)`; it replaces
   the built-in policy (Reduce Motion and Low Power Mode still stop the loop).
 - **Style** — `FigureEntrance.climb` (default: grabs the edge and climbs up)
-  or `.spring` (pops straight up); `tempo` scales the speed.
+  or `.spring` (pops straight up); `tempo` scales the speed; `appearDelay`
+  (default 0.8…2 s, drawn at random, scaled by tempo) keeps it hidden for a
+  moment after the screen appears before its first entrance — `0...0` comes
+  out at once. Later cycles and taps don't wait.
 
 ### Running figure
 

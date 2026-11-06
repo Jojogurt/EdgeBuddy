@@ -13,7 +13,8 @@ struct PeekingFigureTests {
         (.jumpingJacks, 2.36),
         (.sideStretch, 3.62),
         (.march, 2.95),
-        (.walk, 2.95),
+        (.wormWalk, 4.48),
+        (.handstand, 4.16),
         (.run, 3.16),
     ])
     func actionDurations(action: FigureAction, expected: Double) {
@@ -24,7 +25,7 @@ struct PeekingFigureTests {
     }
 
     @Test("Every action starts and ends at rest", arguments: [
-        FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .walk, .run,
+        FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run,
     ])
     func endsAtRest(action: FigureAction) {
         let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false)
@@ -180,8 +181,8 @@ struct PeekingFigureTests {
 
     @Test("Tempo scales every time, including the relocation jump")
     func tempo() throws {
-        let normal = FigureTimeline(action: .walk, entrance: .climb, reduceMotion: false, relocating: true)
-        let fast = FigureTimeline(action: .walk, entrance: .climb, reduceMotion: false, relocating: true, tempo: 2)
+        let normal = FigureTimeline(action: .wormWalk, entrance: .climb, reduceMotion: false, relocating: true)
+        let fast = FigureTimeline(action: .wormWalk, entrance: .climb, reduceMotion: false, relocating: true, tempo: 2)
         #expect(abs(fast.duration - normal.duration / 2) < 1e-9)
         #expect(abs(try #require(fast.relocatesAt) - FigureTimeline.duckDuration / 2) < 1e-9)
         let window = try #require(fast.walkWindow), normalWindow = try #require(normal.walkWindow)
@@ -234,16 +235,26 @@ struct PeekingFigureTests {
         #expect(FigurePlacement.trailingInset(fraction: 0, cardWidth: 60, figureWidth: 52, margin: 28) == 28)
     }
 
-    @Test("Walk travels during the steps only; march stays in place")
+    @Test("Worm walk travels a stride per cycle, only while the hands reach; march stays in place")
     func walkWindow() throws {
-        let walk = FigureTimeline(action: .walk, entrance: .spring, reduceMotion: false)
-        let window = try #require(walk.walkWindow)
-        #expect(abs(window.lowerBound - (0.66 + 0.25)) < 1e-9)
-        #expect(abs(window.upperBound - (walk.duration - 0.3)) < 1e-9)
-        #expect(walk.walkProgress(at: 0) == 0)
-        #expect(walk.walkProgress(at: walk.duration) == 1)
+        let worm = FigureTimeline(action: .wormWalk, entrance: .spring, reduceMotion: false)
+        let window = try #require(worm.walkWindow)
+        // Get down (1.1 s), the first arch (0.38 s); get up (1.1 s).
+        #expect(abs(window.lowerBound - (0.66 + 1.1 + 0.38)) < 1e-9)
+        #expect(abs(window.upperBound - (worm.duration - 1.1)) < 1e-9)
+        #expect(abs(try #require(worm.walkDistance) - 3 * FigureEdgePoses.wormStride) < 1e-9)
+        #expect(FigureTimeline.travel(.wormWalk, repeats: 3) == worm.walkDistance)
+        #expect(worm.walkProgress(at: 0) == 0)
+        #expect(worm.walkProgress(at: worm.duration) == 1)
+        // Still while the feet hop up to the hands (the second arch).
+        let arch = window.lowerBound + 0.76
+        #expect(abs(try #require(worm.walkProgress(at: arch - 0.37)) - 1.0 / 3) < 1e-9)
+        #expect(abs(try #require(worm.walkProgress(at: arch)) - 1.0 / 3) < 1e-9)
         #expect(FigureTimeline(action: .march, entrance: .spring, reduceMotion: false).walkWindow == nil)
-        #expect(FigureTimeline(action: .walk, entrance: .spring, reduceMotion: true).walkWindow == nil)
+        let reduced = FigureTimeline(action: .wormWalk, entrance: .spring, reduceMotion: true)
+        #expect(reduced.walkWindow == nil && reduced.walkDistance == nil)
+        // The run glides to a target the stage picks.
+        #expect(FigureTimeline(action: .run, entrance: nil, reduceMotion: false).walkDistance == nil)
     }
 
     // MARK: - Looping
@@ -260,9 +271,9 @@ struct PeekingFigureTests {
     func exitMirrorsEntrance(entrance: FigureEntrance) {
         let enter = FigureTimeline.entranceSteps(entrance)
         let exit = FigureTimeline.exitSteps(entrance)
-        #expect(abs(enter.map(\.0).reduce(0, +) - exit.map(\.0).reduce(0, +)) < 1e-9)
-        #expect(exit.last?.1 == FigureTimeline.hiddenPose(entrance))
-        #expect(Array(exit.dropLast().map(\.1)) == Array(enter.dropLast().map(\.1).reversed()))
+        #expect(abs(enter.map(\.duration).reduce(0, +) - exit.map(\.duration).reduce(0, +)) < 1e-9)
+        #expect(exit.last?.joints == FigureTimeline.hiddenPose(entrance))
+        #expect(Array(exit.dropLast().map(\.joints)) == Array(enter.dropLast().map(\.joints).reversed()))
     }
 
     @Test("Reversed easings mirror their forward curve")
@@ -294,7 +305,7 @@ struct PeekingFigureTests {
     }
 
     @Test("Repeat count changes the action's beats", arguments: [
-        (FigureAction.wave, 0.4), (.jumpingJacks, 0.6), (.march, 0.8), (.walk, 0.8),
+        (FigureAction.wave, 0.4), (.jumpingJacks, 0.6), (.march, 0.8), (.wormWalk, 0.76), (.handstand, 0.64),
         (.run, 0.66), (.rest, 0.48), (.sideStretch, 2.9),
     ])
     func repeatCount(action: FigureAction, beat: Double) {
@@ -310,7 +321,7 @@ struct PeekingFigureTests {
     @Test("Random variation stays inside its ranges")
     func randomVariation() {
         var generator = SystemRandomNumberGenerator()
-        for action in [FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .walk, .run] {
+        for action in [FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run] {
             for _ in 0..<50 {
                 let v = FigureVariation.random(for: action, exit: .spring, using: &generator)
                 #expect(FigureVariation.holdBeforeRange.contains(v.holdBefore))
@@ -363,7 +374,7 @@ struct PeekingFigureTests {
             #expect(looped.joints(at: (window.lowerBound + window.upperBound) / 2) == .rest)
         }
         let walk = FigureTimeline(
-            action: .walk, entrance: .spring, reduceMotion: false, variation: loopVariation(repeats: 2, exit: .spring)
+            action: .wormWalk, entrance: .spring, reduceMotion: false, variation: loopVariation(repeats: 2, exit: .spring)
         )
         let window = walk.walkWindow!
         #expect(walk.stillWindows.allSatisfy { !($0.lowerBound < window.upperBound && $0.upperBound > window.lowerBound) })
@@ -485,13 +496,15 @@ struct PeekingFigureTests {
         }
     }
 
-    @Test("Flag holds the side edge with both hands, peek with one, head on the card")
+    @Test("Flag holds the side edge with both hands, body outside the card; peek with one, head on the card")
     func sideGrips() {
         for pose in [FigureEdgePoses.flagA, FigureEdgePoses.flagB] {
             let s = FigureSkeleton(pose)
             #expect(abs(s.armL[2].x - (FigureEdgePoses.sideEdgeX - 2.5)) < 0.6)
             #expect(abs(s.armR[2].x - (FigureEdgePoses.sideEdgeX - 2.5)) < 0.6)
-            #expect(s.head.x + FigureSkeleton.headRadius < FigureEdgePoses.sideEdgeX)
+            // Hips and feet past the edge: the flag sticks out of the card.
+            #expect(s.hip.x > FigureEdgePoses.sideEdgeX + 20)
+            #expect(s.legL[2].x > s.hip.x && s.legR[2].x > s.hip.x)
             // Body flat: torso horizontal.
             #expect(abs(s.hip.y - s.torsoTop.y) < 0.5)
         }
@@ -537,7 +550,9 @@ struct PeekingFigureTests {
         #expect(FigureRepertoire.actions(for: .leading) == FigureRepertoire.actions(for: .trailing))
     }
 
-    private let sizes = FigureSizes(figureHeight: 56, minWidth: 108, hangHeight: 49, sideMinHeight: 82)
+    private let sizes = FigureSizes(
+        figureHeight: 56, minWidth: 108, hangHeight: 49, sideMinHeight: 82, climbMinHeight: 136
+    )
 
     @Test("Bottom and side eligibility: hang above the tab bar, side tall enough on screen")
     func edgeEligibility() {
@@ -557,7 +572,24 @@ struct PeekingFigureTests {
         #expect(ok(CGRect(x: 16, y: 600, width: 368, height: 300), .leading))
     }
 
-    @Test("Edge weights: top 60%, bottom 20%, each side 10%; renormalized; top only when asked")
+    @Test("Flag reveals the outside of a side edge only while it sticks out")
+    func flagOutsideReveal() {
+        let flag = FigureTimeline(action: .flag, entrance: nil, reduceMotion: false, edge: .trailing)
+        let reveal = try! #require(flag.outsideReveal)
+        #expect(flag.outsideRevealFraction(at: 0) == 0)
+        #expect(flag.outsideRevealFraction(at: reveal.rampIn.upperBound) == 1)
+        #expect(flag.outsideRevealFraction(at: (reveal.rampIn.upperBound + reveal.rampOut.lowerBound) / 2) == 1)
+        #expect(flag.outsideRevealFraction(at: flag.duration) == 0)
+        // At both ends the pose is the peek, fully inside the edge's grid
+        // except the legs behind it — nothing pops when the reveal starts.
+        #expect(flag.joints(at: reveal.rampIn.lowerBound) == FigureEdgePoses.peek)
+        for action in [FigureAction.peek, .rest] {
+            let other = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: .trailing)
+            #expect(other.outsideReveal == nil)
+        }
+    }
+
+    @Test("Edge weights: 25% each; renormalized; top only when asked")
     func edgeWeights() {
         var generator = SystemRandomNumberGenerator()
         let card = (id: "a", rect: CGRect(x: 16, y: 300, width: 368, height: 120), edges: FigureEdges.all)
@@ -570,12 +602,11 @@ struct PeekingFigureTests {
             counts[pick!.edge, default: 0] += 1
         }
         func share(_ edge: FigureEdge) -> Double { Double(counts[edge, default: 0]) / Double(draws) }
-        #expect(abs(share(.top) - 0.6) < 0.04)
-        #expect(abs(share(.bottom) - 0.2) < 0.04)
-        #expect(abs(share(.leading) - 0.1) < 0.03)
-        #expect(abs(share(.trailing) - 0.1) < 0.03)
+        for edge in [FigureEdge.top, .bottom, .leading, .trailing] {
+            #expect(abs(share(edge) - 0.25) < 0.04)
+        }
 
-        // Without the top: bottom 1/2, sides 1/4 each.
+        // Without the top: a third each.
         let noTop = (id: "a", rect: card.rect, edges: FigureEdges([.bottom, .leading, .trailing]))
         var bottoms = 0
         for _ in 0..<draws {
@@ -584,7 +615,7 @@ struct PeekingFigureTests {
             )
             if pick?.edge == .bottom { bottoms += 1 }
         }
-        #expect(abs(Double(bottoms) / Double(draws) - 0.5) < 0.04)
+        #expect(abs(Double(bottoms) / Double(draws) - 1.0 / 3) < 0.04)
 
         // Not looping: only the top.
         for _ in 0..<50 {
@@ -609,5 +640,303 @@ struct PeekingFigureTests {
         #expect(FigurePlacement.sideTop(fraction: 0, track: track, boxHeight: 58, margin: 12) == 112)
         #expect(abs(FigurePlacement.sideTop(fraction: 1, track: track, boxHeight: 58, margin: 12) - 230) < 0.001)
         #expect(abs(FigurePlacement.sideTop(fraction: 2, track: track, boxHeight: 58, margin: 12) - 230) < 0.001)
+    }
+
+    // MARK: - Grips, climb, worm walk, handstand
+
+    /// Every ~1/60 s of `timeline`.
+    private func samples(_ timeline: FigureTimeline) -> [Double] {
+        Array(stride(from: 0, through: timeline.duration, by: 1.0 / 60))
+    }
+
+    /// The segment of `timeline` that `time` falls in (its two keyframes).
+    private func segment(
+        _ timeline: FigureTimeline, at time: Double
+    ) -> (FigureTimeline.Keyframe, FigureTimeline.Keyframe)? {
+        zip(timeline.keyframes, timeline.keyframes.dropFirst()).first { time > $0.time && time <= $1.time }
+    }
+
+    /// Everything drawn — joints widened by the stroke caps, the head by its
+    /// radius — as one box in grid units.
+    private func extent(_ joints: FigureJoints) -> CGRect {
+        let s = FigureSkeleton(joints)
+        let limbs = s.armL + s.armR + s.legL + s.legR + [s.hip, s.torsoTop]
+        let cap = FigureSkeleton.limbWidth / 2, r = FigureSkeleton.headRadius
+        var box = CGRect(origin: limbs[0], size: .zero)
+        for point in limbs { box = box.union(CGRect(x: point.x - cap, y: point.y - cap, width: 2 * cap, height: 2 * cap)) }
+        // The torso is wider than the limbs.
+        let torso = FigureSkeleton.torsoWidth / 2
+        for point in [s.hip, s.torsoTop] {
+            box = box.union(CGRect(x: point.x - torso, y: point.y - torso, width: 2 * torso, height: 2 * torso))
+        }
+        return box.union(CGRect(x: s.head.x - r, y: s.head.y - r, width: 2 * r, height: 2 * r))
+    }
+
+    @Test("IK: a hand reaches its target, keeps its elbow side, straightens out of reach")
+    func ikPlacing() {
+        let target = CGPoint(x: 70, y: 30)
+        let placed = FigureJoints.rest.placing(.armR, at: target)
+        #expect(distance(FigureSkeleton(placed).armR[2], target) < 1e-6)
+        #expect(placed.elbowR < 0)
+        let far = FigureJoints.rest.placing(.armR, at: CGPoint(x: 99, y: 46))
+        #expect(abs(far.elbowR) < 1e-6)
+        // Mirrored figures solve as drawn.
+        let mirrored = FigureEdgePoses.climbA.placing(.legL, at: CGPoint(x: 100, y: 90))
+        #expect(distance(FigureSkeleton(mirrored).legL[2], CGPoint(x: 100, y: 90)) < 1e-6)
+    }
+
+    @Test("Bottom: both hands stay on their grips through the entrance, rest, swing, pull-up and exit")
+    func bottomGripsSampled() {
+        let hang = FigureSkeleton(FigureEdgePoses.hang)
+        let grips = [hang.armL[2], hang.armR[2]]
+        var variation = FigureVariation.standard
+        variation.exit = .climb
+        variation.hiddenPause = 1
+        for action in [FigureAction.rest, .swing, .pullUp] {
+            let timeline = FigureTimeline(
+                action: action, entrance: .climb, reduceMotion: false, edge: .bottom, variation: variation
+            )
+            for time in samples(timeline) {
+                let s = FigureSkeleton(timeline.joints(at: time))
+                // Never crossed.
+                #expect(s.armL[2].x < s.armR[2].x)
+                guard let (a, b) = segment(timeline, at: time), b.limbs == FigureEdgePoses.hangGrips else { continue }
+                // On the grip line all the time, on the grips whenever both ends hang there.
+                #expect(abs(s.armL[2].x - grips[0].x) < 0.6 && abs(s.armR[2].x - grips[1].x) < 0.6)
+                let ends = [FigureSkeleton(a.joints), FigureSkeleton(b.joints)]
+                if ends.allSatisfy({ distance($0.armL[2], grips[0]) < 0.6 && distance($0.armR[2], grips[1]) < 0.6 }) {
+                    #expect(distance(s.armL[2], grips[0]) < 0.6, "armL at \(time)")
+                    #expect(distance(s.armR[2], grips[1]) < 0.6, "armR at \(time)")
+                }
+            }
+        }
+        // Ducking from the bottom: the hands slide up the grip line.
+        let duck = FigureTimeline(
+            action: .wave, entrance: .spring, reduceMotion: false, edge: .top, relocating: true, from: .bottom
+        )
+        for time in stride(from: 0.0, through: FigureTimeline.duckDuration, by: 1.0 / 60) {
+            let s = FigureSkeleton(duck.joints(at: time))
+            #expect(abs(s.armL[2].x - grips[0].x) < 0.6 && abs(s.armR[2].x - grips[1].x) < 0.6)
+        }
+    }
+
+    @Test("Bottom: bent arms always bend outward — a wide-grip hang, swing and pull-up")
+    func bottomElbowsOutward() {
+        var variation = FigureVariation.standard
+        variation.exit = .climb
+        variation.hiddenPause = 1
+        /// How far `elbow` lies to the right of the line from `shoulder` to `hand` (grid units).
+        func rightOfLine(_ chain: [CGPoint]) -> Double {
+            let (shoulder, elbow, hand) = (chain[0], chain[1], chain[2])
+            let t = (elbow.y - shoulder.y) / (hand.y - shoulder.y)
+            return elbow.x - (shoulder.x + (hand.x - shoulder.x) * t)
+        }
+        var bentSamples = 0
+        for action in [FigureAction.rest, .swing, .pullUp] {
+            let timeline = FigureTimeline(
+                action: action, entrance: .climb, reduceMotion: false, edge: .bottom, variation: variation
+            )
+            for time in samples(timeline) {
+                let joints = timeline.joints(at: time)
+                let s = FigureSkeleton(joints)
+                if abs(joints.elbowL) > 15 {
+                    bentSamples += 1
+                    #expect(rightOfLine(s.armL) < 0 && s.armL[1].x < s.armL[0].x, "\(action) armL at \(time)")
+                }
+                if abs(joints.elbowR) > 15 {
+                    #expect(rightOfLine(s.armR) > 0 && s.armR[1].x > s.armR[0].x, "\(action) armR at \(time)")
+                }
+            }
+        }
+        #expect(bentSamples > 20)
+        for pose in [FigureEdgePoses.pullMid, FigureEdgePoses.pullTop, FigureEdgePoses.swingLeft, FigureEdgePoses.swingRight] {
+            let s = FigureSkeleton(pose)
+            #expect(rightOfLine(s.armL) <= 0.01 && rightOfLine(s.armR) >= -0.01)
+        }
+        let top = FigureSkeleton(FigureEdgePoses.pullTop)
+        #expect(top.armL[1].x < top.armL[0].x && top.armR[1].x > top.armR[0].x)
+    }
+
+    @Test("Side: held hands stay put through the peek and the flag")
+    func sideGripsSampled() {
+        for action in [FigureAction.rest, .peek, .flag] {
+            let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: .trailing)
+            for time in samples(timeline) {
+                guard let (a, b) = segment(timeline, at: time), !b.limbs.isEmpty else { continue }
+                let s = FigureSkeleton(timeline.joints(at: time))
+                for limb in FigureLimb.allCases where b.limbs[limb] == .held {
+                    let start = FigureSkeleton(a.joints).end(of: limb)
+                    #expect(distance(start, FigureSkeleton(b.joints).end(of: limb)) < 0.6)
+                    #expect(distance(s.end(of: limb), start) < 0.6, "\(limb) at \(time)")
+                    #expect(abs(s.end(of: limb).x - FigureEdgePoses.sideGripX) < 0.6)
+                }
+            }
+        }
+    }
+
+    @Test("Climb: outside the card, facing it, hand over hand; held hands and feet stay put on the card")
+    func climbOutside() throws {
+        let climb = FigureTimeline(action: .climb, entrance: nil, reduceMotion: false, edge: .trailing)
+        let distanceUp = try #require(climb.walkDistance)
+        #expect(abs(distanceUp - 2 * 3 * FigureEdgePoses.climbReach) < 1e-9)
+        #expect(FigureTimeline.travel(.climb, repeats: 3) == climb.walkDistance)
+        // Climbing poses: hands on the edge, feet on it, hip past it, in profile facing the card.
+        for pose in [FigureEdgePoses.climbA, FigureEdgePoses.climbB] {
+            let s = FigureSkeleton(pose)
+            #expect(abs(s.armL[2].x - FigureEdgePoses.sideGripX) < 1e-6 && abs(s.armR[2].x - FigureEdgePoses.sideGripX) < 1e-6)
+            #expect(abs(s.legL[2].x - FigureEdgePoses.climbFootX) < 1e-6)
+            #expect(s.hip.x > FigureEdgePoses.sideEdgeX + 5)
+            #expect(pose.profile == 1 && pose.facing == -1)
+            let box = extent(pose)
+            #expect(box.minY >= 0 && box.maxY <= PeekingFigureMetrics.sideBox.height)
+            #expect(box.maxX <= 2 * PeekingFigureMetrics.sideBox.width)
+        }
+        // The outside ramps in from the peek and back out to it.
+        let reveal = try #require(climb.outsideReveal)
+        #expect(climb.joints(at: reveal.rampIn.lowerBound) == FigureEdgePoses.peek)
+        #expect(climb.final == FigureEdgePoses.peek)
+        #expect(abs(reveal.rampOut.upperBound - climb.duration) < 1e-9)
+        let window = try #require(climb.walkWindow)
+        #expect(climb.outsideRevealFraction(at: window.lowerBound) == 1)
+        #expect(climb.outsideRevealFraction(at: window.upperBound) == 1)
+        // A held limb stays at one spot on the card: its grid y minus the
+        // distance risen so far is constant over its segment.
+        for time in samples(climb) {
+            guard let (a, b) = segment(climb, at: time), b.travel > 0 else { continue }
+            let s = FigureSkeleton(climb.joints(at: time))
+            let risen = try #require(climb.walkProgress(at: time)) * distanceUp
+            let risenAtStart = try #require(climb.walkProgress(at: a.time)) * distanceUp
+            for limb in FigureLimb.allCases where b.limbs[limb] == .held {
+                let start = FigureSkeleton(a.joints).end(of: limb)
+                #expect(abs((s.end(of: limb).y - risen) - (start.y - risenAtStart)) < 0.6, "\(limb) at \(time)")
+                #expect(abs(s.end(of: limb).x - start.x) < 0.6)
+            }
+        }
+    }
+
+    @Test("Climb goes up: it starts low on the side and ends a climb's distance higher")
+    func climbGoesUp() throws {
+        let metrics = PeekingFigureMetrics.standard
+        let card = CGRect(x: 16, y: 200, width: 368, height: 300)
+        let span = metrics.travelSpan(at: .trailing, on: card)
+        let range = metrics.spotRange(at: .trailing, on: card, viewport: viewport)
+        let room = metrics.travelRoom(at: .trailing, on: card, viewport: viewport, from: nil)
+        let climb = try #require(FigureTimeline.travel(.climb, repeats: 3))
+        #expect(room >= climb)
+        let start = range.upperBound
+        let target = FigurePlacement.travelTarget(from: start, distance: climb, direction: -1, scale: metrics.scale, span: span)
+        #expect(target < start)
+        #expect(target >= range.lowerBound)
+        // The box rises exactly the climb's distance in points.
+        func top(_ fraction: Double) -> CGFloat {
+            FigurePlacement.sideTop(
+                fraction: fraction, track: card.minY...card.maxY,
+                boxHeight: metrics.size(for: .trailing).height, margin: metrics.sideMargin
+            )
+        }
+        #expect(abs((top(start) - top(target)) - CGFloat(climb) * metrics.scale) < 0.01)
+    }
+
+    @Test("Climb is offered only where the side on screen is tall enough for it")
+    func climbNeedsRoom() throws {
+        let metrics = PeekingFigureMetrics.standard
+        let sizes = metrics.sizes
+        let minimum = try #require(FigureTimeline.minimumTravel(.climb))
+        #expect(abs(minimum - 2 * 2 * FigureEdgePoses.climbReach) < 1e-9)
+        #expect(sizes.climbMinHeight == 136)
+        func actions(height: CGFloat) -> [FigureAction] {
+            let card = CGRect(x: 16, y: 200, width: 368, height: height)
+            let room = metrics.travelRoom(at: .trailing, on: card, viewport: viewport, from: nil)
+            return FigureRepertoire.actions(for: .trailing, room: room)
+        }
+        #expect(actions(height: sizes.climbMinHeight).contains(.climb))
+        #expect(actions(height: sizes.climbMinHeight + 40).contains(.climb))
+        // Tall enough for the peek and the flag, not for the climb.
+        #expect(actions(height: sizes.climbMinHeight - 2) == [.peek, .flag])
+        #expect(FigureAnchorPicker.isEligible(
+            rect: CGRect(x: 16, y: 200, width: 368, height: sizes.climbMinHeight - 2),
+            edge: .trailing, viewport: viewport, sizes: sizes
+        ))
+        // A tall card mostly off screen: only what shows counts.
+        let tall = CGRect(x: 16, y: 600, width: 368, height: 600)
+        let room = metrics.travelRoom(at: .trailing, on: tall, viewport: viewport, from: nil)
+        #expect(!FigureRepertoire.actions(for: .trailing, room: room).contains(.climb))
+        // Bottom: nothing travels.
+        #expect(FigureRepertoire.actions(for: .bottom, room: 0) == FigureRepertoire.bottom)
+        // Narrow tops drop the worm walk.
+        #expect(!FigureRepertoire.actions(for: .top, room: 10).contains(.wormWalk))
+        #expect(FigureRepertoire.actions(for: .top, room: 1000) == FigureRepertoire.top)
+    }
+
+    @Test("Worm walk and handstand stay inside the top's box, never below the edge", arguments: [
+        FigureAction.wormWalk, .handstand,
+    ])
+    func topFloorWorkInBox(action: FigureAction) {
+        for repeats in FigureVariation.repeatRange(action) {
+            let timeline = FigureTimeline(
+                action: action, entrance: nil, reduceMotion: false, variation: FigureVariation(repeats: repeats)
+            )
+            for time in samples(timeline) {
+                let joints = timeline.joints(at: time)
+                // Travelling left the stage mirrors it around the box's middle.
+                let mirrored = joints.with { $0.facing = 1 - 2 * $0.profile; $0.x *= $0.facing }
+                for box in [extent(joints), extent(mirrored)] {
+                    #expect(box.minX >= -0.3 && box.maxX <= FigureSkeleton.peekBox.width + 0.3, "x \(box) at \(time)")
+                    #expect(box.minY >= 0 && box.maxY <= FigureSkeleton.edgeY + 0.3, "y \(box) at \(time)")
+                }
+            }
+        }
+    }
+
+    @Test("Worm walk: lies flat in profile; held hands and feet stay put on the card")
+    func wormHolds() throws {
+        let flat = FigureSkeleton(FigureEdgePoses.wormFlat)
+        #expect(FigureEdgePoses.wormFlat.profile == 1)
+        #expect(abs(flat.hip.y - flat.torsoTop.y) < 0.5)
+        let worm = FigureTimeline(action: .wormWalk, entrance: nil, reduceMotion: false)
+        let distanceWalked = try #require(worm.walkDistance)
+        for time in samples(worm) {
+            guard let (a, b) = segment(worm, at: time), !b.limbs.isEmpty else { continue }
+            let s = FigureSkeleton(worm.joints(at: time))
+            let walked = try #require(worm.walkProgress(at: time)) * distanceWalked
+            let walkedAtStart = try #require(worm.walkProgress(at: a.time)) * distanceWalked
+            for limb in FigureLimb.allCases where b.limbs[limb] == .held {
+                let start = FigureSkeleton(a.joints).end(of: limb)
+                // Grips and planted feet; the rest of `.held` slides on purpose
+                // (the legs stretching back to lie down).
+                let end = FigureSkeleton(b.joints).end(of: limb)
+                guard b.travel > 0 || distance(start, end) < 0.6 else { continue }
+                #expect(abs((s.end(of: limb).x + walked) - (start.x + walkedAtStart)) < 0.6, "\(limb) at \(time)")
+                #expect(abs(s.end(of: limb).y - start.y) < 0.6)
+            }
+        }
+    }
+
+    @Test("Handstand: upside down on straight arms, hands on the edge, held through the wobble")
+    func handstandPose() {
+        let s = FigureSkeleton(FigureEdgePoses.handstand)
+        for hand in [s.armL[2], s.armR[2]] {
+            #expect(abs(hand.y - FigureEdgePoses.groundY) < 1e-6)
+        }
+        #expect(s.legL[2].y < s.hip.y && s.hip.y < s.torsoTop.y)
+        let timeline = FigureTimeline(action: .handstand, entrance: nil, reduceMotion: false)
+        let grips = [s.armL[2], s.armR[2]]
+        for time in samples(timeline) {
+            guard let (_, b) = segment(timeline, at: time), b.limbs == .hands else { continue }
+            let pose = FigureSkeleton(timeline.joints(at: time))
+            #expect(distance(pose.armL[2], grips[0]) < 0.6 && distance(pose.armR[2], grips[1]) < 0.6, "at \(time)")
+        }
+    }
+
+    @Test("Appear delay: 0.8–2 s by default, scaled by tempo; 0...0 comes out at once")
+    func appearDelay() {
+        var generator = SystemRandomNumberGenerator()
+        #expect(FigureStyle.standard.appearDelay == 0.8...2.0)
+        for _ in 0..<50 {
+            #expect((0.8...2.0).contains(FigureStyle.standard.entranceDelay(using: &generator)))
+            #expect((0.4...1.0).contains(FigureStyle(tempo: 2).entranceDelay(using: &generator)))
+        }
+        #expect(FigureStyle(appearDelay: 0...0).entranceDelay(using: &generator) == 0)
+        #expect(FigureStyle(appearDelay: 1.5...1.5).entranceDelay(using: &generator) == 1.5)
     }
 }
