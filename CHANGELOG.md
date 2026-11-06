@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-11-06
 
 First release, extracted from the Nextleg app.
 
