@@ -1,5 +1,9 @@
 # EdgeBuddy
 
+[![CI](https://github.com/Jojogurt/EdgeBuddy/actions/workflows/ci.yml/badge.svg)](https://github.com/Jojogurt/EdgeBuddy/actions/workflows/ci.yml)
+[![Swift Package Index](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FJojogurt%2FEdgeBuddy%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/Jojogurt/EdgeBuddy)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A tiny stick figure that lives on the edges of your SwiftUI cards.
 
 EdgeBuddy adds one small, single-colour figure to a screen. It comes out from
@@ -26,10 +30,6 @@ A tap sends it to another card. It never plays the same action twice in a
 row (nor the same edge of the same card) while there is something else to do. It rides along while the content scrolls and
 waits for the scroll to stop before coming out again.
 
-<!-- TODO: GIFs — a screen with several cards (top + bottom + sides), a single
-     onboarding card, the running loader. Record on an iPhone simulator in light
-     and dark mode, ~6 s each, and put them in `docs/media/`. -->
-
 ## Requirements
 
 - iOS 18+ (also builds for macOS 15+)
@@ -42,7 +42,7 @@ enter the URL, or in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Jojogurt/EdgeBuddy.git", from: "0.1.0"),
+    .package(url: "https://github.com/Jojogurt/EdgeBuddy.git", from: "0.2.0"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: ["EdgeBuddy"]),
@@ -55,7 +55,7 @@ XcodeGen (`project.yml`):
 packages:
   EdgeBuddy:
     url: https://github.com/Jojogurt/EdgeBuddy.git
-    from: 0.1.0
+    from: 0.2.0
 ```
 
 ## Quick start

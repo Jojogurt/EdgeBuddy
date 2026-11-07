@@ -6,6 +6,8 @@ change in minor releases.
 
 ## Unreleased
 
+## 0.2.0 — 2026-11-07
+
 - **Pinned figure** for screenshots, previews and snapshot tests:
   `figurePinned(_:)` with `FigurePin(anchor:edge:pose:spot:animated:)` and the
   public `FigurePose`. No entrance delay, no random picks, no loop, no tap
@@ -44,7 +46,7 @@ change in minor releases.
 - `FigureStyle.appearDelay` (default 0.8…2 s): a short wait before the first
   entrance after a screen appears.
 - `figureOpacity(_:)`.
-- Edge weights: 25 % each.
+- Edge weights: 25 % each (were 60 / 20 / 10 / 10 %).
 
 ## 0.1.0 — 2026-11-06
 
