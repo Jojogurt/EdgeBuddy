@@ -62,26 +62,13 @@ Decisions:
 - [x] Executed (inside a page; above NavigationStack/TabView parked)
 - [x] Committed
 
-### Phase 5 — Characters with their own skeleton and animations (2026-11-07)
-- Context: `FigureCharacter` (Phase 4 step 2) only draws the human skeleton; motion and edge contact are hard-coded for a human in `FigureRig.swift`. A ghost has no arms/legs, so jumping jacks etc. make no sense.
-- **Goal:** the library ships `HumanFigure` (skeleton + IK + animations); a user adds a character by writing a type that conforms to the protocol and brings its own pose model, actions, geometry and drawing.
-- **Decisions:**
-  - Protocol grows into a full description: own `Pose: Sendable` with `interpolated(to:)` (type-erased wrapper in the stage/environment), actions per edge (duration, `pose(at:)`, room needed, travels along the edge or not; empty list = edge unsupported), `rest`/`hidden` poses (generic entrance = rise from hidden to rest, overridable), draw boxes per edge + contact point, `draw(pose:)`.
-  - `HumanFigure` = current rig behind the protocol, behaviour unchanged (95 tests are the safety net). `FigureTimeline`/`FigureEdgePoses` become its internals.
-  - `FigureAppearance` moves into `HumanFigure` as parameters (`.figureCharacter(HumanFigure(head: …, limbScale: …))`); `FigureAppearance.character` goes away (pre-1.0, API may break in a minor).
-  - Pins refer to a character's action by name/id; `FigurePose` stays as the convenient alias for `HumanFigure`. `RunningFigure` stays human-only.
-  - Execution order: (1) extract protocol, move human behind it, no behaviour change; (2) public API + a ghost with its own skeleton/actions in the demo; (3) appearance → `HumanFigure` params; docs, changelog.
-- Risks: freezes the animation model as public API (ship as 0.x, say so); per-frame cost of `pose(at:)` + `draw` (measure with signposts); hit testing/layout follow the character's boxes.
-- [x] Discussed
-- [ ] Researched
-- [ ] Planned
-- [ ] Executed
-- [ ] Committed
-
 ---
 
 ## Deferred (parking lot)
 
+- Bug (pre-existing, seen on d8363d6 too): right after launch the first play can end standing and never loop — likely idle motion turning on (scene becoming active) while that play still runs, so `onChange(of: idleMotionEnabled)` finds `startDate != nil` and nothing resumes once it ends. Fix: resume at the end of a play when `canLoop` and it was built without an exit.
+- Custom characters: travel under a bottom edge (`travelRoom` is 0 there, kept for the human); a per-action entrance/exit; exposing the stage's heading to `draw` instead of mirroring.
+- Phase 5 follow-ups: visual check of the demo on macOS (built only); `HumanFigure.actions(at:)` describes whole plays — consider beats if users build on the human's motion.
 - Stage above `NavigationStack`/`TabView`: environment-held anchor registry instead of preferences (cost: per-frame pushes from every anchor; measure first).
 - CONTRIBUTING.md, SECURITY.md, issue/PR templates.
 - DocC articles (Getting Started, Snapshots, Custom figure).
@@ -93,3 +80,4 @@ Decisions:
 ## Completed (collapsed)
 - Phase 3 — Demo + README GIF (2026-11-07): multiplatform demo xcodeproj, 4 tabs, CI build, README GIF — 42222f2
 - Phase 4 — Custom figure (2026-11-07): `FigureAppearance` (0ae5505) + `FigureCharacter` protocol (7450c85)
+- Phase 5 — Characters with own skeleton and animations (2026-11-07): type-erased stage (0a4051d), public `FigureCharacter`/`HumanFigure` + demo `Ghost` (5057edf), look as `HumanFigure` params, `FigureAppearance` removed, docs (505fa0d). Deviations: `HumanFigure` plays through the unchanged rig and describes its actions as whole plays; `Pose` must be `Equatable` (still windows); extra `figureCharacter(_: any FigureCharacter)` overload.
