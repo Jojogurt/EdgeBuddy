@@ -77,6 +77,7 @@ Decisions:
 - Naming consistency: `peekingFigure` vs the `figureX` family.
 
 ## Completed (collapsed)
+- Fix 0.3.1 — anchor in a horizontal pager nested in a vertical ScrollView (2026-11-07): viewport Y from the vertical scroll view, X from the pager; side reclamp deferred to scroll end — 63bfc43
 - Phase 3 — Demo + README GIF (2026-11-07): multiplatform demo xcodeproj, 4 tabs, CI build, README GIF — 42222f2
 - Phase 4 — Custom figure (2026-11-07): `FigureAppearance` (0ae5505) + `FigureCharacter` protocol (7450c85)
 - Phase 5 — Characters with own skeleton and animations (2026-11-07): type-erased stage (0a4051d), public `FigureCharacter`/`HumanFigure` + demo `Ghost` (5057edf), look as `HumanFigure` params, `FigureAppearance` removed, docs (505fa0d). Deviations: `HumanFigure` plays through the unchanged rig and describes its actions as whole plays; `Pose` must be `Equatable` (still windows); extra `figureCharacter(_: any FigureCharacter)` overload.
