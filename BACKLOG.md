@@ -66,10 +66,11 @@ Decisions:
 - `Examples/EdgeBuddyDemo` as a committed `.xcodeproj`, multiplatform iOS + macOS, local package reference.
 - Tabs: Playground (colour, height, opacity, tempo, entrance, appearDelay, haptics, isWaiting), Pinning (pose/anchor/edge/spot/animated), Static (no ScrollView, stage on the screen body), Single card (`peekingFigure`).
 - Build it in CI; record a GIF/video for the README.
+- **Done (2026-11-07, uncommitted):** `Examples/EdgeBuddyDemo/{project.yml,Sources/,EdgeBuddyDemo.xcodeproj}` (xcodegen, `supportedDestinations: [iOS, macOS]`, local package path `../..`), `.gitignore` exception for the demo xcodeproj, 4 tabs; builds clean for iOS Simulator and macOS; CI builds both; `Examples/Media/demo.gif` (iPhone 17e Simulator, 360 px, ~100 KB) embedded in README. GIF shows the Playground tab only.
 - [x] Discussed
-- [ ] Researched
-- [ ] Planned
-- [ ] Executed
+- [x] Researched
+- [x] Planned
+- [x] Executed
 - [ ] Committed
 
 ### Phase 4 — Custom figure

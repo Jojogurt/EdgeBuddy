@@ -24,3 +24,11 @@ jobs:
           xcodebuild test -scheme EdgeBuddy \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
             -quiet
+      - name: Build demo (iOS Simulator)
+        run: |
+          xcodebuild build -project Examples/EdgeBuddyDemo/EdgeBuddyDemo.xcodeproj \
+            -scheme EdgeBuddyDemo -destination 'generic/platform=iOS Simulator' -quiet
+      - name: Build demo (macOS)
+        run: |
+          xcodebuild build -project Examples/EdgeBuddyDemo/EdgeBuddyDemo.xcodeproj \
+            -scheme EdgeBuddyDemo -destination 'platform=macOS' -quiet

@@ -4,6 +4,7 @@
 /Packages
 .swiftpm/
 *.xcodeproj
+!/Examples/EdgeBuddyDemo/EdgeBuddyDemo.xcodeproj
 xcuserdata/
 DerivedData/
 *.xcresult

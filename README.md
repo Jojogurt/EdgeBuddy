@@ -6,6 +6,8 @@
 
 A tiny stick figure that lives on the edges of your SwiftUI cards.
 
+<p align="center"><img src="Examples/Media/demo.gif" width="240" alt="The figure climbing out from behind a card and waving"></p>
+
 EdgeBuddy adds one small, single-colour figure to a screen. It comes out from
 behind a card you mark, plays a short random action, goes back and comes out
 somewhere else:
@@ -233,7 +235,7 @@ For a single card (`peekingFigure`) use
 
 ## Example
 
-`Examples/EdgeBuddyDemo` is a one-file demo app — see its README.
+`Examples/EdgeBuddyDemo` is a multiplatform (iOS + macOS) demo app with four tabs — Playground, Pinning, Static and Single card. Open `Examples/EdgeBuddyDemo/EdgeBuddyDemo.xcodeproj` in Xcode and run; see its README.
 
 ## License
 

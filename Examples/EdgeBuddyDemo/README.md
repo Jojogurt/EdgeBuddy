@@ -1,16 +1,20 @@
 # EdgeBuddyDemo
 
-A one-file SwiftUI app showing EdgeBuddy: a scrolling screen of cards with one
-figure, live colour / height / haptics settings, a "hold the stage" switch and
-a `RunningFigure` loader.
+A multiplatform (iOS 18 + macOS 15) SwiftUI app showing EdgeBuddy. It
+references the package in this repository by path, so it always runs the
+local sources.
 
 ## Run it
 
-1. In Xcode, create a new iOS App project (SwiftUI, iOS 18 or later).
-2. Add the package: **File › Add Package Dependencies… › Add Local…** and pick
-   the root of this repository (or use the GitHub URL), then add the
-   `EdgeBuddy` library to the app target.
-3. Replace the generated `…App.swift` and `ContentView.swift` with
-   `EdgeBuddyDemoApp.swift` from this folder.
-4. Run on an iPhone simulator or device. Scroll, tap the figure, and try the
-   settings.
+Open `EdgeBuddyDemo.xcodeproj` in Xcode 16 or later, pick an iPhone simulator
+or "My Mac" and run. No XcodeGen needed; `project.yml` is only the source the
+project was generated from (`xcodegen generate` in this folder).
+
+## Tabs
+
+| Tab | Shows |
+|---|---|
+| Playground | `figureStage` on a `ScrollView`; colour, height, opacity, tempo, entrance, appear delay, loops, haptics, `isWaiting`; `RunningFigure` as a loader |
+| Pinning | `figurePinned` with a stage on the whole screen: anchor, edge, pose, spot, animated |
+| Static | no `ScrollView` — the stage on a screen's `body` |
+| Single card | `peekingFigure()` for one-off cards |
