@@ -1568,10 +1568,13 @@ enum FigureAnchorPicker {
     /// play something other than the last action — nil = any), another
     /// anchor than `current`, another edge than `currentEdge` of the same
     /// anchor. Among what is left an edge is drawn by `FigureEdge.weight`,
-    /// then an anchor with it. nil when no anchor fits anywhere.
+    /// then an anchor with it. `viewportFor` narrows the visible area per anchor
+    /// (the scroll view it sits in); nil = `viewport` for all. nil when no
+    /// anchor fits anywhere.
     static func nextPlacement<ID: Hashable>(
         current: ID?, currentEdge: FigureEdge? = nil,
         candidates: [(id: ID, rect: CGRect, edges: FigureEdges)], viewport: CGRect?,
+        viewportFor: ((ID) -> CGRect?)? = nil,
         sizes: FigureSizes, allowed: FigureEdges = .all,
         offersFresh: ((_ id: ID, _ rect: CGRect, _ edge: FigureEdge) -> Bool)? = nil,
         using generator: inout some RandomNumberGenerator
@@ -1579,7 +1582,11 @@ enum FigureAnchorPicker {
         let pairs = candidates.flatMap { candidate in
             FigureEdge.allCases
                 .filter { candidate.edges.intersection(allowed).contains($0.member) }
-                .filter { isEligible(rect: candidate.rect, edge: $0, viewport: viewport, sizes: sizes) }
+                .filter {
+                    isEligible(
+                        rect: candidate.rect, edge: $0, viewport: viewportFor?(candidate.id) ?? viewport, sizes: sizes
+                    )
+                }
                 .map { (id: candidate.id, rect: candidate.rect, edge: $0) }
         }
         func preferring(

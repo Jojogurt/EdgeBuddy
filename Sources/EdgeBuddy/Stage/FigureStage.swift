@@ -6,6 +6,9 @@ struct FigureAnchorItem {
     let id: AnyHashable
     let edges: FigureEdges
     let bounds: Anchor<CGRect>
+    /// Visible area of the scroll view the view sits in, in global space;
+    /// nil = not in a scroll view (or not measured yet).
+    var region: CGRect?
 }
 
 /// A marked view resolved into the stage's space.
@@ -13,6 +16,9 @@ struct FigureAnchorFrame: Equatable {
     let id: AnyHashable
     let edges: FigureEdges
     let rect: CGRect
+    /// The part of the stage this anchor's scroll view shows (between its
+    /// bars), in the stage's space; nil = the stage's own viewport.
+    var viewport: CGRect?
 }
 
 /// Collects the marked views under a stage, in layout order.
@@ -35,9 +41,7 @@ extension View {
     ///     under the bottom, peeks / flags / climbs at the sides. Each is used
     ///     only while the figure fits there and that part is on screen.
     public func figureAnchor(_ id: some Hashable, edges: FigureEdges = .top) -> some View {
-        anchorPreference(key: FigureAnchorsKey.self, value: .bounds) {
-            [FigureAnchorItem(id: AnyHashable(id), edges: edges, bounds: $0)]
-        }
+        modifier(FigureAnchorModifier(id: AnyHashable(id), edges: edges))
     }
 
     /// One small figure for the whole screen, put on the screen's
@@ -49,9 +53,19 @@ extension View {
     /// coming out.
     ///
     /// It stands over whatever is above the anchor (its feet on the anchor's
-    /// edge, the rest hidden behind it) and is clipped to the visible area
-    /// between the bars. Decoration only — hidden from VoiceOver and at
+    /// edge, the rest hidden behind it) and is clipped, per anchor, to the
+    /// visible area of the scroll view that anchor sits in — between its
+    /// navigation and tab bars. Decoration only — hidden from VoiceOver and at
     /// accessibility text sizes.
+    ///
+    /// The stage can sit on the `ScrollView` itself or on any view that
+    /// contains one or several scroll views (a screen's `body`, a `VStack`
+    /// with a header and a list, columns side by side). It must be *inside*
+    /// a `NavigationStack` page or `TabView` tab, not above them — SwiftUI
+    /// does not pass the anchors out of those containers. Sheets, popovers
+    /// and pushed screens are separate hierarchies and need their own stage;
+    /// a view drawn over a card (other than the bars) is not detected —
+    /// use `isWaiting` while a modal is up.
     ///
     /// Tune it with `figureColor(_:)`, `figureOpacity(_:)`, `figureHeight(_:)`,
     /// `figureHaptics(_:)` and `figureMotionEnabled(_:)`.
@@ -98,6 +112,26 @@ extension View {
     }
 }
 
+/// Marks a view and measures the visible area of the scroll view around it.
+private struct FigureAnchorModifier: ViewModifier {
+    let id: AnyHashable
+    let edges: FigureEdges
+    @State private var region: CGRect?
+
+    func body(content: Content) -> some View {
+        content
+            // The scroll view's frame between its bars, in global space: it
+            // does not move while scrolling, so this fires only on layout.
+            .onGeometryChange(for: CGRect?.self) { proxy in
+                let origin = proxy.frame(in: .global).origin
+                return proxy.bounds(of: .scrollView).map { $0.offsetBy(dx: origin.x, dy: origin.y) }
+            } action: { region = $0 }
+            .anchorPreference(key: FigureAnchorsKey.self, value: .bounds) {
+                [FigureAnchorItem(id: id, edges: edges, bounds: $0, region: region)]
+            }
+    }
+}
+
 /// The single anchor of `peekingFigure` (`FigurePin.singleCard`).
 enum SoloAnchor: Hashable, Sendable {
     case id
@@ -108,6 +142,30 @@ enum SoloAnchor: Hashable, Sendable {
 enum FigureMotionPolicy {
     static func idleEnabled(reduceMotion: Bool, lowPowerMode: Bool, scenePhase: ScenePhase) -> Bool {
         !reduceMotion && !lowPowerMode && scenePhase == .active
+    }
+}
+
+/// How many scroll views are scrolling right now: each reports its own
+/// transitions through the one closure, so they are counted.
+struct FigureScrollTracker: Equatable {
+    private(set) var count = 0
+    var isScrolling: Bool { count > 0 }
+
+    mutating func phaseChanged(from old: Bool, to new: Bool) {
+        guard old != new else { return }
+        count = max(0, count + (new ? 1 : -1))
+    }
+}
+
+enum FigureViewport {
+    /// The stage's visible area for an anchor: the scroll view's `region`
+    /// (global space; `origin` = the stage's global origin) inside the stage.
+    /// nil region = the whole stage. A region outside the stage is empty.
+    static func resolve(stage: CGRect, region: CGRect?, origin: CGPoint) -> CGRect {
+        guard let region else { return stage }
+        let local = region.offsetBy(dx: -origin.x, dy: -origin.y)
+        let visible = local.intersection(stage)
+        return visible.isNull ? CGRect(origin: local.origin, size: .zero) : visible
     }
 }
 
@@ -130,7 +188,7 @@ private struct FigureStageModifier: ViewModifier {
     @Environment(\.figureHapticsEnabled) private var hapticsEnabled
     @Environment(\.figureMotionOverride) private var motionOverride
     @Environment(\.figurePin) private var pin
-    @State private var isScrolling = false
+    @State private var scrolling = FigureScrollTracker()
     @State private var tapTick = 0
     @State private var lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
 
@@ -143,20 +201,23 @@ private struct FigureStageModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onScrollPhaseChange { _, phase in
-                if phase.isScrolling != isScrolling { isScrolling = phase.isScrolling }
-            }
+            // Every scroll view below reports here (through bars and tabs too).
+            .onScrollPhaseChange { old, new in scrolling.phaseChanged(from: old.isScrolling, to: new.isScrolling) }
             .overlayPreferenceValue(FigureAnchorsKey.self) { items in
                 if isEnabled, PeekingFigureMetrics.isShown(dynamicTypeSize: dynamicTypeSize) {
                     GeometryReader { proxy in
+                        let origin = proxy.frame(in: .global).origin
+                        let stage = CGRect(origin: .zero, size: proxy.size)
                         PeekingFigureView(
                             anchors: items.map {
                                 FigureAnchorFrame(
-                                    id: $0.id, edges: $0.edges.physical(for: layoutDirection), rect: proxy[$0.bounds]
+                                    id: $0.id, edges: $0.edges.physical(for: layoutDirection), rect: proxy[$0.bounds],
+                                    viewport: isBounded
+                                        ? FigureViewport.resolve(stage: stage, region: $0.region, origin: origin) : nil
                                 )
                             },
-                            viewport: isBounded ? CGRect(origin: .zero, size: proxy.size) : nil,
-                            isScrolling: isScrolling,
+                            viewport: isBounded ? stage : nil,
+                            isScrolling: scrolling.isScrolling,
                             style: style,
                             isWaiting: isWaiting,
                             loops: loops,

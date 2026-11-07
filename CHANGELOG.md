@@ -18,6 +18,13 @@ change in minor releases.
   a side spot is clamped again when the viewport changes.
 - Right-to-left: `FigureEdges.leading` / `.trailing` (also in `FigurePin`) now follow the
   layout direction — leading is the right side in RTL layouts, as documented.
+- Stage on any view: each marked view reports the visible area of its own
+  scroll view (between the navigation and tab bars), so cards under translucent
+  bars no longer count as on screen, the figure is clipped there, and several
+  scroll views under one stage (columns, header + list) work independently.
+  Scroll phases of all of them are counted, not a single flag. The stage must
+  sit inside a `NavigationStack` page / tab, not above it (SwiftUI does not
+  pass preferences out of those containers).
 - CI: tests also run on the iOS Simulator; Xcode pinned to 16.4.
 
 ## 0.2.0 — 2026-11-07

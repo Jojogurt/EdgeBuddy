@@ -173,12 +173,14 @@ struct FigurePinnedPlay: Equatable {
     /// figure fits there and shows whole (`FigureAnchorPicker.isEligible`);
     /// nil = fall back to the free stage.
     static func resolve(
-        _ pin: FigurePin, anchors: [FigureAnchorFrame], viewport: CGRect?,
+        _ pin: FigurePin, anchors: [FigureAnchorFrame], viewport stage: CGRect?,
         metrics: PeekingFigureMetrics, style: FigureStyle
     ) -> FigurePinnedPlay? {
         let edge = pin.figureEdge
-        guard let frame = anchors.first(where: { $0.id == pin.anchor }),
-              FigureAnchorPicker.isEligible(rect: frame.rect, edge: edge, viewport: viewport, sizes: metrics.sizes)
+        guard let frame = anchors.first(where: { $0.id == pin.anchor }) else { return nil }
+        // The anchor's own scroll view, else the stage's.
+        let viewport = frame.viewport ?? stage
+        guard FigureAnchorPicker.isEligible(rect: frame.rect, edge: edge, viewport: viewport, sizes: metrics.sizes)
         else { return nil }
         let range = metrics.spotRange(at: edge, on: frame.rect, viewport: viewport)
         let action = pin.pose.action(at: edge)

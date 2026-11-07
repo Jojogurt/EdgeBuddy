@@ -11,7 +11,9 @@ import SwiftUI
 struct PeekingFigureView: View {
     /// Marked views in the stage's space, in layout order.
     let anchors: [FigureAnchorFrame]
-    /// Visible area in the stage's space; nil = unbounded (a single card).
+    /// Visible area of the whole stage, in its space; nil = unbounded (a single
+    /// card). Each anchor may narrow it (`FigureAnchorFrame.viewport`: the
+    /// scroll view it sits in, between its bars).
     let viewport: CGRect?
     var isScrolling = false
     var style = FigureStyle.standard
@@ -79,6 +81,8 @@ struct PeekingFigureView: View {
             // Behind the card with the clock stopped: nothing to compute or draw.
             let place = isHidden && startDate == nil ? (anchor: nil, edge: edge, spot: spot) : position(at: elapsed)
             if let rect = place.anchor.flatMap(rect(for:)) {
+                // Only the part of the stage the anchor's scroll view shows.
+                let visible = viewport(for: place.anchor)
                 let pose = joints(at: elapsed, edge: place.edge)
                 let frame = figureFrame(at: place.edge, spot: place.spot, on: rect)
                 FigureCanvas(joints: pose, color: color, viewBox: PeekingFigureMetrics.box(for: place.edge))
@@ -94,6 +98,7 @@ struct PeekingFigureView: View {
                     // out — never the content it covers.
                     .allowsHitTesting(Self.isOut(pose, at: place.edge))
                     .position(x: frame.midX, y: frame.midY)
+                    .clipShape(FigureRegionClip(rect: visible))
             }
         }
         .accessibilityHidden(true)
@@ -163,7 +168,7 @@ struct PeekingFigureView: View {
                 comeOut()
             }
         }
-        .onChange(of: viewport) {
+        .onChange(of: viewportSignature) {
             // Laid out for real (the first pass can be empty), or resized.
             reclampSpot()
             if !isPinned, pin != nil, showPin() { return }
@@ -226,10 +231,24 @@ struct PeekingFigureView: View {
         return hasher.finalize()
     }
 
+    /// The visible area for `anchor`: its scroll view's, else the stage's.
+    private func viewport(for anchor: AnyHashable?) -> CGRect? {
+        anchor.flatMap { id in anchors.first { $0.id == id }?.viewport } ?? viewport
+    }
+
+    /// Changes whenever the stage's or an anchor's visible area does (a bar
+    /// grows, a scroll view resizes) — a hash, as it runs every frame.
+    private var viewportSignature: Int {
+        var hasher = Hasher()
+        hasher.combine(viewport)
+        for anchor in anchors { hasher.combine(anchor.viewport) }
+        return hasher.finalize()
+    }
+
     /// The viewport changed: keep the spots on a side inside what is visible now.
     private func reclampSpot() {
         guard !isHidden, !isPinned, let rect = anchorID.flatMap(rect(for:)), edge.isSide else { return }
-        let range = spotRange(at: edge, on: rect)
+        let range = spotRange(at: edge, on: rect, anchor: anchorID)
         spot = min(max(spot, range.lowerBound), range.upperBound)
         walkTarget = min(max(walkTarget, range.lowerBound), range.upperBound)
     }
@@ -284,16 +303,18 @@ struct PeekingFigureView: View {
     }
 
     /// Spots along `edge` of `rect` whose box is on screen right now.
-    private func spotRange(at edge: FigureEdge, on rect: CGRect) -> ClosedRange<Double> {
-        metrics.spotRange(at: edge, on: rect, viewport: viewport)
+    private func spotRange(at edge: FigureEdge, on rect: CGRect, anchor: AnyHashable?) -> ClosedRange<Double> {
+        metrics.spotRange(at: edge, on: rect, viewport: viewport(for: anchor))
     }
 
     /// Some of the figure's box is in the visible area — else the clock stops.
     private var isOnScreen: Bool {
-        guard let viewport else { return true }
+        guard viewport != nil else { return true }
         return [(anchorID, edge, spot), (previousAnchorID, previousEdge, previousSpot)]
-            .compactMap { id, edge, spot in id.flatMap(rect(for:)).map { figureFrame(at: edge, spot: spot, on: $0) } }
-            .contains { $0.intersects(viewport) }
+            .contains { id, edge, spot in
+                guard let visible = self.viewport(for: id), let rect = id.flatMap(rect(for:)) else { return false }
+                return figureFrame(at: edge, spot: spot, on: rect).intersects(visible)
+            }
     }
 
     private func elapsed(at date: Date) -> Double {
@@ -350,10 +371,11 @@ struct PeekingFigureView: View {
             currentEdge: currentEdge,
             candidates: anchors.map { (id: $0.id, rect: $0.rect, edges: $0.edges) },
             viewport: viewport,
+            viewportFor: { viewport(for: $0) },
             sizes: metrics.sizes,
             allowed: allowedEdges,
-            offersFresh: { _, rect, edge in
-                actions(at: edge, on: rect, from: nil).contains { $0 != previous }
+            offersFresh: { id, rect, edge in
+                actions(at: edge, on: rect, anchor: id, from: nil).contains { $0 != previous }
             },
             using: &generator
         )
@@ -362,11 +384,12 @@ struct PeekingFigureView: View {
     /// What it may play at `edge` of `rect` starting at `spot` (nil = it
     /// pops up and picks the spot): the edge's repertoire with the room to
     /// travel there — only the climb at a side by the screen's edge.
-    private func actions(at edge: FigureEdge, on rect: CGRect, from spot: Double?) -> [FigureAction] {
-        FigureRepertoire.actions(
-            for: edge, room: metrics.travelRoom(at: edge, on: rect, viewport: viewport, from: spot),
+    private func actions(at edge: FigureEdge, on rect: CGRect, anchor: AnyHashable?, from spot: Double?) -> [FigureAction] {
+        let visible = viewport(for: anchor)
+        return FigureRepertoire.actions(
+            for: edge, room: metrics.travelRoom(at: edge, on: rect, viewport: visible, from: spot),
             atScreenEdge: FigureAnchorPicker.isAtScreenEdge(
-                rect: rect, edge: edge, viewport: viewport, gap: metrics.screenEdgeGap
+                rect: rect, edge: edge, viewport: visible, gap: metrics.screenEdgeGap
             )
         )
     }
@@ -476,11 +499,12 @@ struct PeekingFigureView: View {
             edge = next?.edge ?? (allowedEdges.contains(current.edge.member) ? current.edge : .top)
         }
         let rect = anchorID.flatMap(rect(for:))
-        let range = rect.map { spotRange(at: edge, on: $0) } ?? 0...1
+        let visible = viewport(for: anchorID)
+        let range = rect.map { spotRange(at: edge, on: $0, anchor: anchorID) } ?? 0...1
         // Room to travel along the edge: a climb needs a tall enough side on
         // screen, a worm walk a wide enough top.
         let room = rect.map {
-            metrics.travelRoom(at: edge, on: $0, viewport: viewport, from: popsUp ? nil : current.spot)
+            metrics.travelRoom(at: edge, on: $0, viewport: visible, from: popsUp ? nil : current.spot)
         } ?? 0
         // Low Power Mode: no action, only the rest pose (and its entrance).
         // Never the last action again while the edge has another.
@@ -490,7 +514,7 @@ struct PeekingFigureView: View {
         } else if let override {
             played = override
         } else {
-            let available = rect.map { actions(at: edge, on: $0, from: popsUp ? nil : current.spot) }
+            let available = rect.map { actions(at: edge, on: $0, anchor: anchorID, from: popsUp ? nil : current.spot) }
                 ?? FigureRepertoire.actions(for: edge, room: room)
             played = FigureRepertoire.next(after: lastAction, from: available, using: &generator)
         }
@@ -521,7 +545,7 @@ struct PeekingFigureView: View {
         // walks toward the wider side).
         let forward = edge == .top && spot > 0.5 ? -1.0 : 1.0
         if let beat = FigureTimeline.travel(played, repeats: 1) {
-            let fromSpot = rect.map { metrics.travelRoom(at: edge, on: $0, viewport: viewport, from: spot) } ?? 0
+            let fromSpot = rect.map { metrics.travelRoom(at: edge, on: $0, viewport: visible, from: spot) } ?? 0
             // The climb goes all the way up: every cycle that fits.
             let wanted = played == .climb ? Int.max : variation.repeats ?? FigureTimeline.canvasRepeats(played)
             variation.repeats = max(1, min(wanted, Int((fromSpot + 1e-9) / beat)))
@@ -546,5 +570,14 @@ struct PeekingFigureView: View {
         hasPlayed = true
         startDate = .now
         playID += 1
+    }
+}
+
+/// Clips to `rect` in the view's own space; nil = no clip.
+struct FigureRegionClip: Shape {
+    let rect: CGRect?
+
+    func path(in bounds: CGRect) -> Path {
+        Path(rect ?? bounds.insetBy(dx: -10_000, dy: -10_000))
     }
 }

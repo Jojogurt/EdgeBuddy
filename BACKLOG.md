@@ -52,12 +52,15 @@ Decisions:
 - Today: viewport = the stage's whole rect; cards under translucent bars count as on screen and the figure can draw over bars (`FigureRig.swift:1503`); with several ScrollViews it is unclear which one drives `isScrolling` (verify on iOS 18).
 - Goal: `figureStage()` on any view, incl. above `NavigationStack`/`TabView`. Each ScrollView reports its visible rect + content insets (`onScrollGeometryChange`) and scroll phase via preference; the stage intersects per anchor and clips there.
 - Keep the current `figureStage` on a ScrollView source-compatible.
+- **Done (2026-11-07, uncommitted):** research on iOS 27 Simulator: `GeometryProxy.bounds(of: .scrollView)` gives the scroll view's frame *between its bars* (608 pt of 844 with large title + tab bar; tracks the title collapsing), `onScrollPhaseChange` on an ancestor reports phases of descendant scroll views (through TabView/NavigationStack) but without identity → counted (`FigureScrollTracker`). `FigureAnchorModifier` stores the region (global space, constant while scrolling → no per-frame state), `FigureAnchorFrame.viewport` carries it per anchor, picker/pin/actions/spot ranges use it, canvas clipped per anchor (`FigureRegionClip`). Verified visually: stage on a VStack with a bar + two scroll views, and on a ScrollView inside NavigationStack.
+- **Finding / deviation from the goal:** a stage *above* `NavigationStack`/`TabView` does NOT work — preferences do not propagate out of those containers (figure never shows). It works anywhere inside a page. Supporting the outer placement would need an environment-held anchor registry (anchors push frames each scroll frame) — parked, see Deferred.
+- Known limits: scroll counter can stick if a scroll view is removed mid-scroll; occlusion by non-bar views not detected (documented).
 - Document: sheets/popovers/pushed screens need their own stage; occlusion by other views is not detected (`isWaiting` for modals); "behind the card" is a rectangular clip — rounded corners near the edge ends.
 - [x] Discussed
-- [ ] Researched
-- [ ] Planned
-- [ ] Executed
-- [ ] Committed
+- [x] Researched
+- [x] Planned
+- [x] Executed (inside a page; above NavigationStack/TabView parked)
+- [x] Committed
 
 ### Phase 3 — Demo + README GIF
 - `Examples/EdgeBuddyDemo` as a committed `.xcodeproj`, multiplatform iOS + macOS, local package reference.
@@ -84,6 +87,7 @@ Decisions:
 
 ## Deferred (parking lot)
 
+- Stage above `NavigationStack`/`TabView`: environment-held anchor registry instead of preferences (cost: per-frame pushes from every anchor; measure first).
 - CONTRIBUTING.md, SECURITY.md, issue/PR templates.
 - DocC articles (Getting Started, Snapshots, Custom figure).
 - Snapshot/regression tests of `FigureCanvas` via `ImageRenderer` + `figurePinned(animated: false)`.
