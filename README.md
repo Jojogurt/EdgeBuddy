@@ -169,6 +169,33 @@ above it (for example once at your app's root):
   moment after the screen appears before its first entrance — `0...0` comes
   out at once. Later cycles and taps don't wait.
 
+### Look and custom figures
+
+`figureAppearance(_:)` changes how the figure is drawn, not what it does:
+
+```swift
+.figureAppearance(FigureAppearance(head: .text("🐻"), headScale: 1.4, armColor: .orange))
+```
+
+`FigureAppearance` takes the head (`.circle`, `.symbol("star.fill")`,
+`.text("🐻")` or `.image(…)`), a size for head, limbs and torso (0.6…1.5) and a
+colour per part. For a different figure altogether, write a `FigureCharacter`
+— it draws one frame from the skeleton points (hip, torso, head, arms, legs,
+already mirrored for a figure facing left, in the rig's 100 × 84 grid) — and
+pass it as `FigureAppearance(character:)`:
+
+```swift
+struct Ghost: FigureCharacter {
+    func draw(_ body: FigureSkeletonPoints, in context: inout GraphicsContext, color: Color) {
+        // draw with `context`, e.g. fill a path from body.head to body.hip
+    }
+}
+```
+
+The stage keeps the motion, clipping, taps and layout; the character only
+draws, on every frame, so keep it cheap. `Stickman` is the default drawing,
+a starting point to copy.
+
 ### Running figure
 
 `RunningFigure` is the same figure in profile, running in place — handy for a

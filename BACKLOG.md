@@ -68,11 +68,12 @@ Decisions:
 - The stage keeps clipping, hit testing and mirroring; custom drawing must fit the viewBox.
 - Sprite sheets rejected: poses are continuous (IK), frames would lose smoothness.
 - **Step 2 decisions (2026-11-07):** not a closure but a protocol — `FigureCharacter: Hashable, Sendable` with `draw(_ body: FigureSkeletonPoints, in: inout GraphicsContext, color:)`; built-in `Stickman` (current drawing, takes today's `FigureAppearance` fields); `FigureAppearance.character` field (wrapped in `AnyFigureCharacter` for equality). `FigureSkeletonPoints` = points + `farLimbOpacity`, `facing`, `lean`, `tilt`, `profile`. Stage mirrors points only; character flips its own art. Draw cost per frame documented; clipped to the grid; layout/hit testing stay those of the default body. `RunningFigure` takes it too.
+- **Step 2 done (2026-11-07):** `FigureCharacter` (Sendable only — dropped `Hashable`: `Image` isn't Hashable and equality is not needed), `FigureSkeletonPoints`, `Stickman`, `FigureAppearance.character` (optional; nil = default drawing tuned by the appearance fields, so no `AnyFigureCharacter`). Tests in `FigureCharacterTests`, demo has a Ghost character (verified in the Simulator), README section. Not done: per-character footprint/hit area, DocC article.
 - **Step 1 done (2026-11-07):** `FigureAppearance` (+ `FigureHead`: circle/symbol/text/image, head/limb/torso scale clamped 0.6…1.5, per-part colours, `mirrorsHead`), `figureAppearance(_:)`, `RunningFigure(appearance:)`; `FigureCanvas` draws the head via Canvas symbols, tilted with lean+tilt. Layout/hit testing unchanged (scales clamp so footprint holds). Tests: `FigureAppearanceTests`; verified bear emoji head in the Simulator. Step 2 (public renderer) not started.
 - [x] Discussed
 - [ ] Researched
-- [ ] Planned
-- [ ] Executed
+- [x] Planned
+- [x] Executed
 - [ ] Committed
 
 ---

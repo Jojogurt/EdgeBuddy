@@ -18,6 +18,10 @@ struct FigureCanvas: View {
             context.scaleBy(x: scale, y: scale)
             context.translateBy(x: -viewBox.minX, y: -viewBox.minY)
             let skeleton = FigureSkeleton(joints)
+            if let character = appearance.character {
+                character.draw(FigureSkeletonPoints(skeleton, joints: joints), in: &context, color: color)
+                return
+            }
             func shading(_ part: Color?) -> GraphicsContext.Shading { .color(part ?? color) }
             let limb = StrokeStyle(
                 lineWidth: FigureSkeleton.limbWidth * appearance.limbScale, lineCap: .round, lineJoin: .round

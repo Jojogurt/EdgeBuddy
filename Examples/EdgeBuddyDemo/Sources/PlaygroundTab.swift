@@ -17,13 +17,14 @@ struct PlaygroundTab: View {
     }
 
     private enum Head: String, CaseIterable {
-        case circle = "Circle", bear = "🐻", star = "Star"
+        case circle = "Circle", bear = "🐻", star = "Star", ghost = "Ghost"
 
         var figureHead: FigureHead {
             switch self {
             case .circle: .circle
             case .bear: .text("🐻")
             case .star: .symbol("star.fill")
+            case .ghost: .circle
             }
         }
     }
@@ -69,7 +70,10 @@ struct PlaygroundTab: View {
                 loops: loops
             )
             .figureColor(color)
-            .figureAppearance(FigureAppearance(head: head.figureHead, headScale: head == .circle ? 1 : 1.5))
+            .figureAppearance(FigureAppearance(
+                head: head.figureHead, headScale: head == .circle ? 1 : 1.5,
+                character: head == .ghost ? Ghost() : nil
+            ))
             .figureOpacity(opacity)
             .figureHeight(height)
             .figureHaptics(haptics)

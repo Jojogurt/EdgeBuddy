@@ -14,6 +14,7 @@
 		C9BF74C19058B4782CAE9AF3 /* Card.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4870BF9A2AFBB45E5000CB00 /* Card.swift */; };
 		E7A890B8B3C7A7A4B4E3994A /* PinningTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74548C88BCB1D3167795163A /* PinningTab.swift */; };
 		EF2C6B1D07B3C0BF094960A2 /* StaticTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C525CFE7909757D8BFFEA07 /* StaticTab.swift */; };
+		F3C97DA881257B6127A6C705 /* Ghost.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EB5B01B5B08CE0D103873D /* Ghost.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +26,7 @@
 		74548C88BCB1D3167795163A /* PinningTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinningTab.swift; sourceTree = "<group>"; };
 		82478EE9E77219536040077D /* EdgeBuddyDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = EdgeBuddyDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9C525CFE7909757D8BFFEA07 /* StaticTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaticTab.swift; sourceTree = "<group>"; };
+		E6EB5B01B5B08CE0D103873D /* Ghost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghost.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +54,7 @@
 			children = (
 				4870BF9A2AFBB45E5000CB00 /* Card.swift */,
 				19D2CC25CE7878A9F9777040 /* EdgeBuddyDemoApp.swift */,
+				E6EB5B01B5B08CE0D103873D /* Ghost.swift */,
 				74548C88BCB1D3167795163A /* PinningTab.swift */,
 				48EF0238545C717664FC2BB1 /* PlaygroundTab.swift */,
 				203772441583BE6AF9F0B7E5 /* SingleCardTab.swift */,
@@ -142,6 +145,7 @@
 			files = (
 				C9BF74C19058B4782CAE9AF3 /* Card.swift in Sources */,
 				2959B4B5B8E8C3771993712E /* EdgeBuddyDemoApp.swift in Sources */,
+				F3C97DA881257B6127A6C705 /* Ghost.swift in Sources */,
 				E7A890B8B3C7A7A4B4E3994A /* PinningTab.swift in Sources */,
 				BC76348D99C513C1D1A7DDA9 /* PlaygroundTab.swift in Sources */,
 				90F6FC1F3BDF8D7C708F6ACA /* SingleCardTab.swift in Sources */,

@@ -18,3 +18,23 @@ import Testing
         #expect(!standard.mirrorsHead)
     }
 }
+
+@Suite struct FigureCharacterTests {
+    @Test func pointsCarryTheSkeletonAndAngles() {
+        var joints = FigureJoints.rest
+        joints.lean = 12
+        joints.tilt = -5
+        joints.facing = -1
+        let skeleton = FigureSkeleton(joints)
+        let points = FigureSkeletonPoints(skeleton, joints: joints)
+        #expect(points.hip == skeleton.hip && points.head == skeleton.head)
+        #expect(points.legR == skeleton.legR && points.armL == skeleton.armL)
+        #expect(points.lean == 12 && points.tilt == -5 && points.facing == -1)
+        #expect(points.farLimbOpacity == skeleton.farLimbOpacity)
+    }
+
+    @Test func characterIsStoredOnTheAppearance() {
+        #expect(FigureAppearance.standard.character == nil)
+        #expect(FigureAppearance(character: Stickman()).character is Stickman)
+    }
+}
