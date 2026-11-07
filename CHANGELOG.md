@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
-## Unreleased
+## 0.3.0 — 2026-11-07
 
 - Fix: right after launch the figure could come out once and stand still forever — when looping became
   allowed (the scene turning active) while the first play was still running, nothing resumed the loop.
