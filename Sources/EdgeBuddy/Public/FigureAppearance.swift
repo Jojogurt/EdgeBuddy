@@ -47,20 +47,13 @@ public struct FigureAppearance: Sendable {
     /// true = a `symbol`, `text` or `image` head is flipped when the figure
     /// faces left; false (default) keeps it as drawn (right for text).
     public var mirrorsHead: Bool
-    /// A figure of your own that replaces the drawing altogether; nil = the
-    /// default figure, tuned by the other fields. With a character the head,
-    /// scale and colour fields above are ignored (the character gets
-    /// `figureColor(_:)` and does the rest itself).
-    public var character: (any FigureCharacter)?
 
     /// An appearance; every parameter has the default look.
     public init(
         head: FigureHead = .circle, headScale: Double = 1, limbScale: Double = 1,
         torsoScale: Double = 1, headColor: Color? = nil, torsoColor: Color? = nil,
-        armColor: Color? = nil, legColor: Color? = nil, mirrorsHead: Bool = false,
-        character: (any FigureCharacter)? = nil
+        armColor: Color? = nil, legColor: Color? = nil, mirrorsHead: Bool = false
     ) {
-        self.character = character
         self.head = head
         self.headScale = Self.clamp(headScale)
         self.limbScale = Self.clamp(limbScale)

@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// A pose a pinned figure (`FigurePin`) plays and then holds still in — the
-/// actions that have a clear still frame. Each belongs to an edge; pinned at
-/// another edge, the figure rests there instead.
-public enum FigurePose: CaseIterable, Hashable, Sendable {
+/// A pose of ``HumanFigure`` a pinned figure (`FigurePin`) plays and then
+/// holds still in — the actions that have a clear still frame. Each belongs
+/// to an edge; pinned at another edge, the figure rests there instead. Its
+/// raw value is the action's name (`FigurePin.action`).
+public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     /// Standing with hands on hips (top), hanging (bottom), peeking from
     /// behind the edge (sides) — every edge.
     case rest
@@ -37,12 +38,11 @@ public enum FigurePose: CaseIterable, Hashable, Sendable {
     }
 
     /// The pose's name — the same as the rig's action it plays.
-    var name: String { String(describing: self) }
+    var name: String { rawValue }
 
     /// The pose called `name`; nil = no such pose.
     init?(name: String) {
-        guard let pose = Self.allCases.first(where: { $0.name == name }) else { return nil }
-        self = pose
+        self.init(rawValue: name)
     }
 
     /// The rig's action for this pose at `edge`: the pose where it is played,
@@ -64,13 +64,16 @@ public enum FigurePose: CaseIterable, Hashable, Sendable {
     }
 }
 
-/// Pins a stage's figure to one anchor, edge and pose — a deterministic,
+/// Pins a stage's figure to one anchor, edge and action — a deterministic,
 /// still figure for screenshots, previews and snapshot tests
 /// (`figurePinned(_:)`).
 ///
 /// With a pin the stage skips the entrance delay and every random pick: the
 /// figure comes out at `edge` of the anchor `anchor` (whatever edges that
-/// anchor allows), plays `pose` and freezes at its hold frame. It never
+/// anchor allows), plays `action` and freezes at its hold frame
+/// (`FigureCharacterAction.hold`). An action the character doesn't play at
+/// that edge rests there instead; an edge it never plays at falls back as
+/// below. It never
 /// loops, ignores taps, and holds the frame also under Reduce Motion, in Low
 /// Power Mode and with idle motion off. When the anchor is not on screen or
 /// the figure does not fit at that edge, the stage behaves as without a pin
@@ -81,8 +84,11 @@ public struct FigurePin: Hashable, @unchecked Sendable {
     public let anchor: AnyHashable
     /// The edge the figure comes out at.
     public let edge: FigureEdges
-    /// What it plays and holds.
-    public let pose: FigurePose
+    /// The name of the character's action it plays and holds
+    /// (`FigureCharacterAction.name`; "rest" = the rest pose).
+    public let action: String
+    /// The ``HumanFigure`` pose it holds; nil for another character's action.
+    public var pose: FigurePose? { FigurePose(rawValue: action) }
     /// Where along the edge, 0…1: left to right on the top and the bottom,
     /// top to bottom at the sides.
     public let spot: Double
@@ -106,24 +112,35 @@ public struct FigurePin: Hashable, @unchecked Sendable {
         anchor: some Hashable & Sendable, edge: FigureEdges = .top, pose: FigurePose,
         spot: Double = 0.5, animated: Bool = true
     ) {
-        self.anchor = AnyHashable(anchor)
-        self.edge = edge
-        self.pose = pose
-        self.spot = min(max(spot, 0), 1)
-        self.animated = animated
+        self.init(anchor: anchor, edge: edge, action: pose.rawValue, spot: spot, animated: animated)
     }
 
-    private init(anchor: AnyHashable, edge: FigureEdges, pose: FigurePose, spot: Double, animated: Bool) {
+    /// A pin at `edge` of the anchor `anchor`, holding the character's
+    /// action called `action` — for a character of your own
+    /// (`FigureCharacterAction.name`).
+    ///
+    /// - Parameters: as `init(anchor:edge:pose:spot:animated:)`; `action`
+    ///   is the action's name ("rest" = the rest pose).
+    public init(
+        anchor: some Hashable & Sendable, edge: FigureEdges = .top, action: String,
+        spot: Double = 0.5, animated: Bool = true
+    ) {
+        self.init(
+            anchor: AnyHashable(anchor), edge: edge, action: action, spot: min(max(spot, 0), 1), animated: animated
+        )
+    }
+
+    private init(anchor: AnyHashable, edge: FigureEdges, action: String, spot: Double, animated: Bool) {
         self.anchor = anchor
         self.edge = edge
-        self.pose = pose
+        self.action = action
         self.spot = spot
         self.animated = animated
     }
 
     /// The pin with its edge as a physical side (`FigureEdges.physical(for:)`).
     func physical(for direction: LayoutDirection) -> FigurePin {
-        FigurePin(anchor: anchor, edge: edge.physical(for: direction), pose: pose, spot: spot, animated: animated)
+        FigurePin(anchor: anchor, edge: edge.physical(for: direction), action: action, spot: spot, animated: animated)
     }
 
     /// A pin for the figure of a single card (`peekingFigure`), whose only
@@ -134,6 +151,13 @@ public struct FigurePin: Hashable, @unchecked Sendable {
         edge: FigureEdges = .top, pose: FigurePose, spot: Double = 0.5, animated: Bool = true
     ) -> FigurePin {
         FigurePin(anchor: SoloAnchor.id, edge: edge, pose: pose, spot: spot, animated: animated)
+    }
+
+    /// `singleCard(edge:pose:spot:animated:)` for a character's action by name.
+    public static func singleCard(
+        edge: FigureEdges = .top, action: String, spot: Double = 0.5, animated: Bool = true
+    ) -> FigurePin {
+        FigurePin(anchor: SoloAnchor.id, edge: edge, action: action, spot: spot, animated: animated)
     }
 
     /// The single rig edge for `edge`.
@@ -188,13 +212,14 @@ struct FigurePinnedPlay: Equatable {
         metrics: PeekingFigureMetrics, style: FigureStyle, character: AnyFigureCharacter = HumanRig.character()
     ) -> FigurePinnedPlay? {
         let edge = pin.figureEdge
-        guard let frame = anchors.first(where: { $0.id == pin.anchor }) else { return nil }
+        guard character.geometry.supportedEdges.contains(edge.member),
+              let frame = anchors.first(where: { $0.id == pin.anchor }) else { return nil }
         // The anchor's own scroll view, else the stage's.
         let viewport = frame.viewport ?? stage
         guard FigureAnchorPicker.isEligible(rect: frame.rect, edge: edge, viewport: viewport, sizes: metrics.sizes)
         else { return nil }
         let range = metrics.spotRange(at: edge, on: frame.rect, viewport: viewport)
-        let action = character.pinnedAction(pin.pose.name, at: edge)
+        let action = character.pinnedAction(pin.action, at: edge)
         let timeline = character.play(FigurePlayRequest(
             action: action, entrance: pin.animated ? style.entrance : nil, reduceMotion: false,
             edge: edge, tempo: style.tempo

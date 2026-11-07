@@ -1,21 +1,5 @@
 import SwiftUI
 
-/// The part of a character's coordinate space drawn at one edge, and where
-/// the card's edge runs through it.
-struct FigureCharacterBox: Equatable, Sendable {
-    /// The drawn rectangle, the character's units, y down. Nothing outside
-    /// it shows; it is also the tap area.
-    var rect: CGRect
-    /// The card's edge in the same units: a y for the top and the bottom,
-    /// an x for the sides (drawn as the trailing side, the card to the left).
-    var edge: CGFloat
-
-    init(_ rect: CGRect, edge: CGFloat) {
-        self.rect = rect
-        self.edge = edge
-    }
-}
-
 /// A character's footprint at every edge — what layout, hit testing and the
 /// anchor picker need (`PeekingFigureMetrics`).
 struct FigureGeometry: Equatable, Sendable {
@@ -67,6 +51,16 @@ struct AnyFigureCharacter: Sendable {
     private let pinnedAt: @Sendable (_ action: String, _ edge: FigureEdge) -> String
     private let makePlay: @Sendable (FigurePlayRequest) -> FigurePlay
     private let frameAt: @Sendable (_ play: FigurePlay, _ time: Double, _ edge: FigureEdge, _ heading: Double) -> FigureFrame?
+
+    /// `character` erased: the human rig for `HumanFigure`, else the
+    /// generic sequencing of its actions (`FigureSequence`).
+    init<Character: FigureCharacter>(_ character: Character) {
+        if let human = character as? HumanFigure {
+            self = HumanRig.character(human)
+        } else {
+            self = CustomRig.character(character)
+        }
+    }
 
     init(
         typeID: ObjectIdentifier, geometry: FigureGeometry,

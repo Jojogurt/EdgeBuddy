@@ -46,13 +46,9 @@ enum FigureAction: CaseIterable, Equatable, Sendable {
     }
 }
 
-/// The edge of an anchor the figure is at. Top: stands on it, the rest
-/// hidden below. Bottom: hangs under it, hidden above. Sides: beside the
-/// card, outside its edge — the card hides whatever is behind it (inside the
-/// edge). Drawn as the trailing side; leading is its mirror image.
-enum FigureEdge: CaseIterable, Hashable, Sendable {
-    case top, bottom, leading, trailing
-
+/// The stage's view of an edge (`FigureEdge` is public). Inside the stage
+/// the sides are physical: leading = left (`FigureEdges.physical(for:)`).
+extension FigureEdge {
     var isSide: Bool { self == .leading || self == .trailing }
 
     /// The `FigureEdges` member for this edge.

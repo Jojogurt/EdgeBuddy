@@ -432,7 +432,7 @@ struct PeekingFigureView: View {
     /// pose's hold frame. False = the pin doesn't fit now; nothing changed.
     private func showPin() -> Bool {
         guard let pin, let play = FigurePinnedPlay.resolve(
-            pin, anchors: anchors, viewport: viewport, metrics: metrics, style: style
+            pin, anchors: anchors, viewport: viewport, metrics: metrics, style: style, character: character
         ) else { return false }
         isPinned = true
         isDelayingEntrance = false

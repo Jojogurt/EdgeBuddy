@@ -3,10 +3,11 @@ import SwiftUI
 /// The human figure on the stage: the rig (`FigureTimeline`,
 /// `FigureEdgePoses`, `FigureRepertoire`) behind the type-erased character.
 enum HumanRig {
-    /// The human character drawn with `appearance`.
-    static func character(_ appearance: FigureAppearance = .standard) -> AnyFigureCharacter {
-        AnyFigureCharacter(
-            typeID: ObjectIdentifier(FigureTimeline.self),
+    /// `figure` on the stage.
+    static func character(_ figure: HumanFigure = HumanFigure()) -> AnyFigureCharacter {
+        let appearance = figure.appearance
+        return AnyFigureCharacter(
+            typeID: ObjectIdentifier(HumanFigure.self),
             geometry: .human,
             actions: { edge, room, atScreenEdge in
                 FigureRepertoire.actions(for: edge, room: room, atScreenEdge: atScreenEdge).map(\.name)
@@ -78,10 +79,6 @@ enum HumanRig {
 enum HumanDrawing {
     static func draw(_ joints: FigureJoints, appearance: FigureAppearance, in context: inout GraphicsContext, color: Color) {
         let skeleton = FigureSkeleton(joints)
-        if let character = appearance.character {
-            character.draw(FigureSkeletonPoints(skeleton, joints: joints), in: &context, color: color)
-            return
-        }
         func shading(_ part: Color?) -> GraphicsContext.Shading { .color(part ?? color) }
         let limb = StrokeStyle(
             lineWidth: FigureSkeleton.limbWidth * appearance.limbScale, lineCap: .round, lineJoin: .round

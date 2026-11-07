@@ -70,10 +70,8 @@ struct PlaygroundTab: View {
                 loops: loops
             )
             .figureColor(color)
-            .figureAppearance(FigureAppearance(
-                head: head.figureHead, headScale: head == .circle ? 1 : 1.5,
-                character: head == .ghost ? Ghost() : nil
-            ))
+            .figureAppearance(FigureAppearance(head: head.figureHead, headScale: head == .circle ? 1 : 1.5))
+            .ghost(head == .ghost)
             .figureOpacity(opacity)
             .figureHeight(height)
             .figureHaptics(haptics)
@@ -115,5 +113,12 @@ struct PlaygroundTab: View {
         }
         .frame(width: 54, height: 56)
         .accessibilityLabel("Loading")
+    }
+}
+
+private extension View {
+    /// The ghost character instead of the default figure.
+    @ViewBuilder func ghost(_ on: Bool) -> some View {
+        if on { figureCharacter(Ghost()) } else { self }
     }
 }
