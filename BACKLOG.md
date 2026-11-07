@@ -62,17 +62,6 @@ Decisions:
 - [x] Executed (inside a page; above NavigationStack/TabView parked)
 - [x] Committed
 
-### Phase 3 — Demo + README GIF
-- `Examples/EdgeBuddyDemo` as a committed `.xcodeproj`, multiplatform iOS + macOS, local package reference.
-- Tabs: Playground (colour, height, opacity, tempo, entrance, appearDelay, haptics, isWaiting), Pinning (pose/anchor/edge/spot/animated), Static (no ScrollView, stage on the screen body), Single card (`peekingFigure`).
-- Build it in CI; record a GIF/video for the README.
-- **Done (2026-11-07, uncommitted):** `Examples/EdgeBuddyDemo/{project.yml,Sources/,EdgeBuddyDemo.xcodeproj}` (xcodegen, `supportedDestinations: [iOS, macOS]`, local package path `../..`), `.gitignore` exception for the demo xcodeproj, 4 tabs; builds clean for iOS Simulator and macOS; CI builds both; `Examples/Media/demo.gif` (iPhone 17e Simulator, 360 px, ~100 KB) embedded in README. GIF shows the Playground tab only.
-- [x] Discussed
-- [x] Researched
-- [x] Planned
-- [x] Executed
-- [ ] Committed
-
 ### Phase 4 — Custom figure
 - Step 1: `FigureAppearance` — head as `Image`/emoji/SF Symbol (handle tilt + mirroring), limb/torso width, head size, per-part colour.
 - Step 2: public renderer — closure gets the skeleton points (hip, torsoTop, head, arms, legs, far-limb opacity), `GraphicsContext` and size/viewBox. Name clash: `FigurePose` is already the pinned-pose enum — pick another name (e.g. `FigureSkeletonPoints`).
@@ -97,3 +86,4 @@ Decisions:
 - Naming consistency: `peekingFigure` vs the `figureX` family.
 
 ## Completed (collapsed)
+- Phase 3 — Demo + README GIF (2026-11-07): multiplatform demo xcodeproj, 4 tabs, CI build, README GIF — 42222f2
