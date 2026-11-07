@@ -43,7 +43,7 @@ extension View {
     /// - Parameter height: the figure's height in points; values below 16
     ///   are raised to 16.
     public func figureHeight(_ height: CGFloat) -> some View {
-        environment(\.figureHeight, height)
+        environment(\.figureHeight, PeekingFigureMetrics.clampedHeight(height))
     }
 
     /// Turns the selection haptic played when the figure is tapped on or

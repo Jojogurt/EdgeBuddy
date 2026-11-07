@@ -5,12 +5,22 @@ on:
     branches: [main]
   pull_request:
 
+# Xcode is pinned so a runner-image update can't change the compiler under us.
+# 16.4 = Swift 6.1, the oldest toolchain the package targets in practice.
+env:
+  DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+
 jobs:
   test:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Toolchain
+        run: xcodebuild -version
       - name: Test (macOS)
         run: swift test
-      - name: Build (iOS Simulator)
-        run: xcodebuild build -scheme EdgeBuddy -destination 'generic/platform=iOS Simulator' -quiet
+      - name: Test (iOS Simulator)
+        run: |
+          xcodebuild test -scheme EdgeBuddy \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -quiet

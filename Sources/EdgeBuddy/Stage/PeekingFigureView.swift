@@ -22,6 +22,9 @@ struct PeekingFigureView: View {
     var metrics = PeekingFigureMetrics.standard
     /// Idle motion allowed (foreground, not Low Power) — gates the loop.
     var idleMotionEnabled = true
+    /// Low Power Mode is on — the stage's single source of truth (it follows
+    /// the system notification); no action, only the rest pose, and no loop.
+    var lowPowerMode = false
     /// Pinned to one anchor, edge and pose (`figurePinned(_:)`); nil = free.
     var pin: FigurePin?
     var onTap: () -> Void = {}
@@ -73,7 +76,8 @@ struct PeekingFigureView: View {
     var body: some View {
         TimelineView(.animation(paused: startDate == nil || isStill || !isOnScreen)) { context in
             let elapsed = elapsed(at: context.date)
-            let place = position(at: elapsed)
+            // Behind the card with the clock stopped: nothing to compute or draw.
+            let place = isHidden && startDate == nil ? (anchor: nil, edge: edge, spot: spot) : position(at: elapsed)
             if let rect = place.anchor.flatMap(rect(for:)) {
                 let pose = joints(at: elapsed, edge: place.edge)
                 let frame = figureFrame(at: place.edge, spot: place.spot, on: rect)
@@ -136,15 +140,17 @@ struct PeekingFigureView: View {
         .onChange(of: isScrolling) { _, scrolling in
             if !scrolling, isParked, !isWaiting { comeOut() }
         }
-        .onChange(of: anchors.map(\.id)) { _, ids in
-            if isPinned, let anchorID, !ids.contains(anchorID) {
+        // A hash, not an array: this expression runs on every scroll frame.
+        .onChange(of: anchorSignature) {
+            let hasAnchor = anchorID.map { id in anchors.contains { $0.id == id } } ?? true
+            if isPinned, !hasAnchor {
                 // The pinned card went away: free again until it is back.
                 isPinned = false
                 frozenElapsed = nil
             }
             if !isPinned, pin != nil, showPin() { return }
             guard !isPinned else { return }
-            if let anchorID, !ids.contains(anchorID) {
+            if !hasAnchor {
                 // Its card went away (another segment, out of a lazy stack):
                 // start over from behind another one, after the same wait
                 // as a fresh appearance — the new content settles first.
@@ -159,8 +165,20 @@ struct PeekingFigureView: View {
         }
         .onChange(of: viewport) {
             // Laid out for real (the first pass can be empty), or resized.
+            reclampSpot()
             if !isPinned, pin != nil, showPin() { return }
             if isParked, !isWaiting, !isPinned { comeOut() }
+        }
+        .onChange(of: reduceMotion) { _, reduced in
+            if isPinned {
+                // The pin keeps its still frame, only without (or with) the motion.
+                _ = showPin()
+            } else if reduced {
+                // Mid-action: settle into the rest pose now, no waiting it out.
+                if startDate != nil, !isHidden { play(entrance: nil, action: .rest) }
+            } else if canLoop, hasPlayed, startDate == nil, !isWaiting {
+                resume()
+            }
         }
         .onChange(of: idleMotionEnabled) { _, enabled in
             // Idle motion back on (foreground, Low Power off): pick the loop up.
@@ -200,6 +218,22 @@ struct PeekingFigureView: View {
         }
     }
 
+    /// Changes whenever the anchors' ids (or their order) do — not their
+    /// frames, which move with every scroll frame.
+    private var anchorSignature: Int {
+        var hasher = Hasher()
+        for anchor in anchors { hasher.combine(anchor.id) }
+        return hasher.finalize()
+    }
+
+    /// The viewport changed: keep the spots on a side inside what is visible now.
+    private func reclampSpot() {
+        guard !isHidden, !isPinned, let rect = anchorID.flatMap(rect(for:)), edge.isSide else { return }
+        let range = spotRange(at: edge, on: rect)
+        spot = min(max(spot, range.lowerBound), range.upperBound)
+        walkTarget = min(max(walkTarget, range.lowerBound), range.upperBound)
+    }
+
     /// Sleeps until `date`; false when cancelled.
     private func sleep(until date: Date) async -> Bool {
         let seconds = date.timeIntervalSinceNow
@@ -209,7 +243,7 @@ struct PeekingFigureView: View {
 
     /// Looping is on and allowed right now.
     private var canLoop: Bool {
-        loops && idleMotionEnabled && !reduceMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled
+        loops && idleMotionEnabled && !reduceMotion && !lowPowerMode
     }
 
     /// The figure is out from behind its card (or edge) far enough to tap.
@@ -282,7 +316,7 @@ struct PeekingFigureView: View {
     /// The pose; on the top it leans a little into the walk, and a run to
     /// the left is mirrored (the turn blends with `profile`).
     private func joints(at elapsed: Double, edge: FigureEdge) -> FigureJoints {
-        var joints = timeline.joints(at: elapsed)
+        var joints = FigureSignpost.interval("joints") { timeline.joints(at: elapsed) }
         guard edge == .top else { return joints }
         if let progress = timeline.walkProgress(at: elapsed), walkTarget != spot, joints.profile == 0 {
             // Fraction grows to the right; lean + = right.
@@ -309,6 +343,8 @@ struct PeekingFigureView: View {
     ) -> (id: AnyHashable, edge: FigureEdge)? {
         var generator = SystemRandomNumberGenerator()
         let previous = lastAction
+        let state = FigureSignpost.signposter.beginInterval("pick")
+        defer { FigureSignpost.signposter.endInterval("pick", state) }
         return FigureAnchorPicker.nextPlacement(
             current: current,
             currentEdge: currentEdge,
@@ -449,7 +485,7 @@ struct PeekingFigureView: View {
         // Low Power Mode: no action, only the rest pose (and its entrance).
         // Never the last action again while the edge has another.
         let played: FigureAction
-        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+        if lowPowerMode {
             played = .rest
         } else if let override {
             played = override

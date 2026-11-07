@@ -123,6 +123,7 @@ private struct FigureStageModifier: ViewModifier {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.figureColor) private var color
     @Environment(\.figureOpacity) private var opacity
     @Environment(\.figureHeight) private var height
@@ -150,7 +151,9 @@ private struct FigureStageModifier: ViewModifier {
                     GeometryReader { proxy in
                         PeekingFigureView(
                             anchors: items.map {
-                                FigureAnchorFrame(id: $0.id, edges: $0.edges, rect: proxy[$0.bounds])
+                                FigureAnchorFrame(
+                                    id: $0.id, edges: $0.edges.physical(for: layoutDirection), rect: proxy[$0.bounds]
+                                )
                             },
                             viewport: isBounded ? CGRect(origin: .zero, size: proxy.size) : nil,
                             isScrolling: isScrolling,
@@ -160,7 +163,8 @@ private struct FigureStageModifier: ViewModifier {
                             color: color,
                             metrics: PeekingFigureMetrics(height: height),
                             idleMotionEnabled: idleMotionEnabled,
-                            pin: pin,
+                            lowPowerMode: lowPowerMode,
+                            pin: pin?.physical(for: layoutDirection),
                             onTap: { tapTick += 1 }
                         )
                     }

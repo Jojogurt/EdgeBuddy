@@ -104,6 +104,19 @@ public struct FigurePin: Hashable, @unchecked Sendable {
         self.animated = animated
     }
 
+    private init(anchor: AnyHashable, edge: FigureEdges, pose: FigurePose, spot: Double, animated: Bool) {
+        self.anchor = anchor
+        self.edge = edge
+        self.pose = pose
+        self.spot = spot
+        self.animated = animated
+    }
+
+    /// The pin with its edge as a physical side (`FigureEdges.physical(for:)`).
+    func physical(for direction: LayoutDirection) -> FigurePin {
+        FigurePin(anchor: anchor, edge: edge.physical(for: direction), pose: pose, spot: spot, animated: animated)
+    }
+
     /// A pin for the figure of a single card (`peekingFigure`), whose only
     /// anchor has no id of yours. Set it on that card or above it.
     ///

@@ -6,6 +6,20 @@ change in minor releases.
 
 ## Unreleased
 
+- Performance baseline: Swift Testing timings of the pure hot paths
+  (`FigureTimeline.joints(at:)`, `FigureSkeleton.init`, IK `placing`,
+  `FigureAnchorPicker` at 10 / 100 / 1000 anchors) and `os_signpost`
+  intervals (Points of Interest: `joints`, `pick`) for Instruments.
+- Less work per scroll frame while the figure is hidden or parked: no pose or
+  drawing, and anchor changes are detected with a hash instead of an id array.
+- Low Power Mode has a single source (the stage's state); Reduce Motion
+  turning on mid-action settles the figure into the rest pose at once.
+- `figureHeight(_:)` clamps when set (non-finite falls back to the default);
+  a side spot is clamped again when the viewport changes.
+- Right-to-left: `FigureEdges.leading` / `.trailing` (also in `FigurePin`) now follow the
+  layout direction — leading is the right side in RTL layouts, as documented.
+- CI: tests also run on the iOS Simulator; Xcode pinned to 16.4.
+
 ## 0.2.0 — 2026-11-07
 
 - **Pinned figure** for screenshots, previews and snapshot tests:

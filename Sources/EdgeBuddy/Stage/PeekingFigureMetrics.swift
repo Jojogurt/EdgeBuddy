@@ -15,7 +15,12 @@ struct PeekingFigureMetrics: Equatable, Sendable {
     let height: CGFloat
 
     init(height: CGFloat = PeekingFigureMetrics.defaultHeight) {
-        self.height = max(height, Self.minimumHeight)
+        self.height = Self.clampedHeight(height)
+    }
+
+    /// `height` raised to the minimum; a non-finite value falls back to the default.
+    static func clampedHeight(_ height: CGFloat) -> CGFloat {
+        height.isFinite ? max(height, minimumHeight) : defaultHeight
     }
 
     /// Width of `FigureSkeleton.peekBox` at `height`.
