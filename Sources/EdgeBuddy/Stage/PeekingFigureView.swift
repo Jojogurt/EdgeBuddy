@@ -214,7 +214,13 @@ struct PeekingFigureView: View {
             }
             guard await sleep(until: start + played.duration) else { return }
             startDate = nil
-            guard let pause = played.hiddenPause else { return }
+            guard let pause = played.hiddenPause else {
+                // A one-shot play (looping was off when it began) just ended: if looping
+                // became allowed meanwhile (the scene turned active mid-entrance), the
+                // `idleMotionEnabled` change was skipped as busy — pick the loop up now.
+                if canLoop, hasPlayed, !isWaiting, !isPinned, !isHidden { resume() }
+                return
+            }
             // Looped cycle: behind the card now — wait, then come out elsewhere.
             isHidden = true
             try? await Task.sleep(for: .seconds(pause))

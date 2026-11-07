@@ -66,7 +66,6 @@ Decisions:
 
 ## Deferred (parking lot)
 
-- Bug (pre-existing, seen on d8363d6 too): right after launch the first play can end standing and never loop — likely idle motion turning on (scene becoming active) while that play still runs, so `onChange(of: idleMotionEnabled)` finds `startDate != nil` and nothing resumes once it ends. Fix: resume at the end of a play when `canLoop` and it was built without an exit.
 - Custom characters: travel under a bottom edge (`travelRoom` is 0 there, kept for the human); a per-action entrance/exit; exposing the stage's heading to `draw` instead of mirroring.
 - Phase 5 follow-ups: visual check of the demo on macOS (built only); `HumanFigure.actions(at:)` describes whole plays — consider beats if users build on the human's motion.
 - Stage above `NavigationStack`/`TabView`: environment-held anchor registry instead of preferences (cost: per-frame pushes from every anchor; measure first).

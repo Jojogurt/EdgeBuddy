@@ -6,6 +6,8 @@ change in minor releases.
 
 ## Unreleased
 
+- Fix: right after launch the figure could come out once and stand still forever — when looping became
+  allowed (the scene turning active) while the first play was still running, nothing resumed the loop.
 - Performance baseline: Swift Testing timings of the pure hot paths
   (`FigureTimeline.joints(at:)`, `FigureSkeleton.init`, IK `placing`,
   `FigureAnchorPicker` at 10 / 100 / 1000 anchors) and `os_signpost`
