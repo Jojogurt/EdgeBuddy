@@ -1,12 +1,34 @@
 import SwiftUI
 
+/// What ``HumanFigure``'s head is drawn as.
+public enum FigureHead: Sendable {
+    /// A filled circle, the default.
+    case circle
+    /// An SF Symbol, tinted with the head colour.
+    case symbol(String)
+    /// A short text — typically one emoji. Emoji keep their own colours.
+    case text(String)
+    /// Any image, fitted into the head's square. Use
+    /// `.renderingMode(.template)` on it to tint it with the head colour.
+    case image(Image)
+}
+
 /// The built-in figure: a stick figure with a skeleton, two-bone IK and the
 /// whole repertoire — waves, jumping jacks, a worm walk and a handstand on
 /// the top, swings and pull-ups under the bottom, peeks, flags and climbs at
 /// the sides — with the climb or spring entrance of `FigureStyle`.
 ///
-/// It is the default character; set it explicitly with
-/// `figureCharacter(_:)` to tune its look.
+/// It is the default character. Set it with `figureCharacter(_:)` to tune
+/// its look — the head, the thickness of head, limbs and torso, a colour
+/// per part:
+///
+/// ```swift
+/// .figureCharacter(HumanFigure(head: .text("🐻"), headScale: 1.4, armColor: .orange))
+/// ```
+///
+/// The look never changes the motion, the layout (the room the figure
+/// needs at an edge) or the tap area, so the sizes are clamped to a range
+/// that stays inside the figure's footprint.
 public struct HumanFigure: FigureCharacter {
     /// One frame of the human rig: the joint angles of the skeleton.
     public struct Pose: FigureCharacterPose {
@@ -27,16 +49,53 @@ public struct HumanFigure: FigureCharacter {
         }
     }
 
-    /// The look (until it moves into the figure's own parameters).
-    var appearance: FigureAppearance
+    /// What the head is drawn as.
+    public var head: FigureHead
+    /// Size of the head relative to the default, 0.6…1.5.
+    public var headScale: Double {
+        didSet { headScale = Self.clamp(headScale) }
+    }
+    /// Thickness of the arms and legs relative to the default, 0.6…1.5.
+    public var limbScale: Double {
+        didSet { limbScale = Self.clamp(limbScale) }
+    }
+    /// Thickness of the torso relative to the default, 0.6…1.5.
+    public var torsoScale: Double {
+        didSet { torsoScale = Self.clamp(torsoScale) }
+    }
+    /// Colour of the head; nil = the figure's colour (`figureColor(_:)`).
+    public var headColor: Color?
+    /// Colour of the torso; nil = the figure's colour.
+    public var torsoColor: Color?
+    /// Colour of the arms; nil = the figure's colour.
+    public var armColor: Color?
+    /// Colour of the legs; nil = the figure's colour.
+    public var legColor: Color?
+    /// true = a `symbol`, `text` or `image` head is flipped when the figure
+    /// faces left; false (default) keeps it as drawn (right for text).
+    public var mirrorsHead: Bool
 
-    /// The default figure.
-    public init() {
-        self.init(appearance: .standard)
+    /// A figure; every parameter has the default look (a round head, one colour).
+    public init(
+        head: FigureHead = .circle, headScale: Double = 1, limbScale: Double = 1,
+        torsoScale: Double = 1, headColor: Color? = nil, torsoColor: Color? = nil,
+        armColor: Color? = nil, legColor: Color? = nil, mirrorsHead: Bool = false
+    ) {
+        self.head = head
+        self.headScale = Self.clamp(headScale)
+        self.limbScale = Self.clamp(limbScale)
+        self.torsoScale = Self.clamp(torsoScale)
+        self.headColor = headColor
+        self.torsoColor = torsoColor
+        self.armColor = armColor
+        self.legColor = legColor
+        self.mirrorsHead = mirrorsHead
     }
 
-    init(appearance: FigureAppearance) {
-        self.appearance = appearance
+    static let scaleRange = 0.6...1.5
+
+    private static func clamp(_ value: Double) -> Double {
+        value.isFinite ? min(max(value, scaleRange.lowerBound), scaleRange.upperBound) : 1
     }
 
     public var referenceHeight: CGFloat { FigureGeometry.human.referenceHeight }
@@ -79,7 +138,7 @@ public struct HumanFigure: FigureCharacter {
     }
 
     public func draw(_ pose: Pose, in context: inout GraphicsContext, color: Color) {
-        HumanDrawing.draw(pose.joints, appearance: appearance, in: &context, color: color)
+        HumanDrawing.draw(pose.joints, figure: self, in: &context, color: color)
     }
 }
 

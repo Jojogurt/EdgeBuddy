@@ -159,6 +159,8 @@ above it (for example once at your app's root):
 - **Size** — default 56 pt (the height above a top edge). Width, margins and
   the footprint at the other edges scale with it.
 - **Haptics** — `.sensoryFeedback(.selection)` on tap, on by default.
+- **Character** — `figureCharacter(_:)`: `HumanFigure` with its look, or a
+  character of your own (below).
 - **Motion** — the built-in policy lets the figure loop only while the scene
   is active and Reduce Motion and Low Power Mode are off. If your app has its
   own idle-motion setting, pass it with `figureMotionEnabled(_:)`; it replaces
@@ -171,35 +173,85 @@ above it (for example once at your app's root):
 
 ### Look and custom figures
 
-`figureAppearance(_:)` changes how the figure is drawn, not what it does:
+`figureCharacter(_:)` picks who plays. The default is `HumanFigure`, the
+stick figure above; its parameters change how it is drawn, not what it does:
 
 ```swift
-.figureAppearance(FigureAppearance(head: .text("🐻"), headScale: 1.4, armColor: .orange))
+.figureCharacter(HumanFigure(head: .text("🐻"), headScale: 1.4, armColor: .orange))
 ```
 
-`FigureAppearance` takes the head (`.circle`, `.symbol("star.fill")`,
-`.text("🐻")` or `.image(…)`), a size for head, limbs and torso (0.6…1.5) and a
-colour per part. For a different figure altogether, write a `FigureCharacter`
-— it draws one frame from the skeleton points (hip, torso, head, arms, legs,
-already mirrored for a figure facing left, in the rig's 100 × 84 grid) — and
-pass it as `FigureAppearance(character:)`:
+`HumanFigure` takes the head (`.circle`, `.symbol("star.fill")`, `.text("🐻")`
+or `.image(…)`), a size for head, limbs and torso (0.6…1.5), a colour per part
+(nil = `figureColor`) and `mirrorsHead`.
+
+For a different figure altogether — say a ghost with no arms or legs —
+write a type conforming to `FigureCharacter`. It brings its own pose model,
+its actions per edge, the room it needs and its drawing; the stage keeps
+picking cards, edges and spots, sequencing each play (out from behind the
+card, a hold, the action, back), taps, Reduce Motion, Low Power Mode and pins:
 
 ```swift
 struct Ghost: FigureCharacter {
-    func draw(_ body: FigureSkeletonPoints, in context: inout GraphicsContext, color: Color) {
-        // draw with `context`, e.g. fill a path from body.head to body.hip
+    struct Pose: FigureCharacterPose {           // whatever one frame needs
+        var y: Double, sway: Double
+        func interpolated(to other: Pose, _ t: Double) -> Pose {
+            Pose(y: y + (other.y - y) * t, sway: sway + (other.sway - sway) * t)
+        }
+    }
+
+    // Its own units: a 64 × 64 box above a top edge (the card's edge at y 64),
+    // 48 × 72 beside a side (the card's edge at x 0, drawn as the trailing side).
+    func box(at edge: FigureEdge) -> FigureCharacterBox {
+        edge == .top ? FigureCharacterBox(CGRect(x: 0, y: 0, width: 64, height: 64), edge: 64)
+                     : FigureCharacterBox(CGRect(x: 0, y: 0, width: 48, height: 72), edge: 0)
+    }
+
+    func actions(at edge: FigureEdge) -> [FigureCharacterAction<Pose>] {
+        guard edge == .top else { return [] }   // no actions = never at that edge
+        let rest = restPose(at: edge)
+        return [
+            FigureCharacterAction("float", motion: FigureMotion(duration: 1.4, through: [
+                rest, Pose(y: 34, sway: 0), rest,
+            ]), repeats: 2...3),
+            FigureCharacterAction("drift", motion: FigureMotion(duration: 0.9) { t in
+                Pose(y: 40, sway: 10 * sin(.pi * t / 0.9))
+            }, repeats: 2...4, travel: 22),         // moves 22 units along the edge per beat
+        ]
+    }
+
+    func restPose(at edge: FigureEdge) -> Pose { Pose(y: 40, sway: 0) }
+    func hiddenPose(at edge: FigureEdge) -> Pose { Pose(y: 106, sway: 0) }  // behind the card
+
+    func draw(_ pose: Pose, in context: inout GraphicsContext, color: Color) {
+        // draw with `context` in the box's units
     }
 }
+
+ScrollView { … }
+    .figureStage()
+    .figureCharacter(Ghost())
 ```
 
-The stage keeps the motion, clipping, taps and layout; the character only
-draws, on every frame, so keep it cheap. `Stickman` is the default drawing,
-a starting point to copy.
+- `box(at:)` — per edge, the part of the character's space that is drawn
+  (and tappable) and where the card's edge runs through it. `referenceHeight`
+  (default: the top box above its edge) is what `figureHeight(_:)` sets in
+  points; widths, margins and the narrowest card it uses follow the boxes.
+- `actions(at:)` — one beat of `FigureMotion` (`pose(at:)` over a duration,
+  or `through:` a few poses), repeated `repeats` times, optionally travelling
+  along the edge (`travel`; a side's travelling action goes up to the top),
+  `hold` for pins, `playsAtScreenEdge`. An empty list means the edge is never used.
+- `restPose(at:)` / `hiddenPose(at:)` and `entrance(at:)` — by default it
+  rises from the hidden pose to the rest pose and sinks back the same way.
+- `draw` and `pose(at:)` run on every frame: keep them cheap.
+
+Pin a character's action by name: `FigurePin(anchor: "hero", action: "float")`.
+`Examples/EdgeBuddyDemo/Sources/Ghost.swift` is a complete ghost (float, sway,
+boo and drift on the top; peek, boo and haunt at the sides; never under a card).
 
 ### Running figure
 
-`RunningFigure` is the same figure in profile, running in place — handy for a
-loading indicator:
+`RunningFigure` is the human figure in profile, running in place — handy for a
+loading indicator (`figure:` takes a `HumanFigure` for its look):
 
 ```swift
 TimelineView(.animation) { context in
@@ -239,6 +291,9 @@ figure doesn't fit at that edge, the stage plays as without a pin and takes
 the pin up as soon as it fits. `figurePinned(nil)` lets it play freely again.
 For a single card (`peekingFigure`) use
 `.figurePinned(.singleCard(pose: .wave))` — its anchor has no id of yours.
+`FigurePose` is the `HumanFigure`'s list; for a character of your own pin an
+action by name, `FigurePin(anchor: "hero", action: "float")` (an action it
+doesn't play at that edge rests; an edge it never uses falls back to the free stage).
 
 ## Accessibility
 

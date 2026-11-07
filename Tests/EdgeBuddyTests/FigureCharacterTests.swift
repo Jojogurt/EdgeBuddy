@@ -331,3 +331,17 @@ struct FigurePinActionTests {
         #expect(byName.timeline.joints(at: byName.holdTime) == FigureEdgePoses.flagA)
     }
 }
+
+@Suite("figureCharacter(_:) — compile-time shapes")
+struct FigureCharacterModifierTests {
+    @Test("A concrete character and one chosen at run time both set the stage's character")
+    @MainActor func modifierOverloads() {
+        let spooky = Bool.random()
+        _ = Color.clear.figureStage().figureCharacter(BlobFigure())
+        _ = Color.clear.figureStage().figureCharacter(HumanFigure(head: .symbol("star.fill")))
+        _ = Color.clear.figureStage().figureCharacter(spooky ? BlobFigure() : HumanFigure() as any FigureCharacter)
+        let chosen: any FigureCharacter = spooky ? BlobFigure() : HumanFigure()
+        let erased = AnyFigureCharacter(chosen)
+        #expect(erased.typeID == ObjectIdentifier(spooky ? BlobFigure.self : HumanFigure.self))
+    }
+}

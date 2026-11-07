@@ -52,6 +52,31 @@ struct PerformanceTests {
         #expect(worst < Self.frame / 10)
     }
 
+    @Test("A frame through the type-erased character: human rig vs a custom character")
+    func erasedFrames() throws {
+        let characters: [(String, AnyFigureCharacter, String)] = [
+            ("human", AnyFigureCharacter(HumanFigure()), "handstand"),
+            ("custom", AnyFigureCharacter(BlobFigure()), "bob"),
+        ]
+        for (name, character, action) in characters {
+            let play = character.play(FigurePlayRequest(
+                action: action, entrance: .spring, reduceMotion: false,
+                variation: FigureVariation(holdBefore: 0.3, repeats: 2, holdAfter: 0.3, exit: .spring, hiddenPause: 1)
+            ))
+            let steps = 240
+            let dt = play.duration / Double(steps)
+            var taps = 0
+            let seconds = mean(iterations: 20) {
+                for i in 0...steps where character.frame(play, at: Double(i) * dt, edge: .top, heading: 0)?.isOut == true {
+                    taps += 1
+                }
+            } / Double(steps + 1)
+            #expect(taps > 0)
+            report("frame \(name)/\(action)", seconds)
+            #expect(seconds < Self.frame / 10)
+        }
+    }
+
     @Test("FigureTimeline.init (building a play), every action")
     func timelineBuild() {
         var worst = 0.0

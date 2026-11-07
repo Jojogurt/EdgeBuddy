@@ -28,10 +28,30 @@ change in minor releases.
 - CI: tests also run on the iOS Simulator; Xcode pinned to 16.4; the demo app is built for iOS Simulator and macOS.
 - Demo: `Examples/EdgeBuddyDemo` is a committed multiplatform `.xcodeproj` with four tabs
   (Playground, Pinning, Static, Single card); a GIF in the README.
-- `FigureAppearance` / `figureAppearance(_:)`: head as a symbol, text/emoji or image, head / limb /
-  torso scale, a colour per part; `RunningFigure(appearance:)`.
-- `FigureCharacter` protocol + `FigureSkeletonPoints` + `Stickman`: draw a completely different
-  figure from the skeleton points (`FigureAppearance(character:)`).
+- **Characters.** `figureCharacter(_:)` sets who plays. `FigureCharacter` describes a whole
+  character: its own `Pose` (`FigureCharacterPose`: `interpolated(to:_:)`), per edge
+  (`FigureEdge`, now public) the drawn box and the card's edge line (`FigureCharacterBox`,
+  `referenceHeight` = what `figureHeight` sets), its actions (`FigureCharacterAction`: name,
+  one beat of `FigureMotion`, repeats, travel along the edge, pin hold, `playsAtScreenEdge`;
+  no actions = edge unused), rest and hidden poses, an optional entrance (default: rise from
+  hidden to rest, exit = backwards) and `draw(_:in:color:)`. The stage sequences plays, picks
+  cards/edges/spots, lays out, hit-tests and clips from the character's boxes, and keeps Reduce
+  Motion, Low Power Mode, pins and RTL as before. See the `Ghost` in the demo.
+- **`HumanFigure`** is the built-in stick figure behind that protocol (unchanged motion, layout
+  and taps) and carries the look as parameters: `head` (`FigureHead`: circle, SF Symbol,
+  text/emoji, image), `headScale` / `limbScale` / `torsoScale` (0.6…1.5), `headColor` /
+  `torsoColor` / `armColor` / `legColor`, `mirrorsHead`. `HumanFigure.Pose.points` gives the
+  joints as `FigureSkeletonPoints`. `RunningFigure(phase:color:viewBox:figure:)` takes a
+  `HumanFigure` for its look.
+- Pins name actions: `FigurePin(anchor:edge:action:spot:animated:)`,
+  `FigurePin.singleCard(edge:action:spot:animated:)`, `FigurePin.action`; `FigurePose` stays
+  as the `HumanFigure`'s poses (now `String`-raw-valued) and `FigurePin.pose` is optional.
+- **Replaces the earlier unreleased look API** (never in a release): `FigureAppearance`,
+  `figureAppearance(_:)`, `FigureAppearance.character`, the draw-only `FigureCharacter` and
+  `Stickman` are gone — use `.figureCharacter(HumanFigure(head:…))` for the look and a
+  `FigureCharacter` of your own for a different figure; `RunningFigure(appearance:)` is now
+  `RunningFigure(figure:)`. Custom heads are drawn straight into the `GraphicsContext`
+  (resolved symbol/text/image) instead of Canvas symbols.
 
 ## 0.2.0 — 2026-11-07
 

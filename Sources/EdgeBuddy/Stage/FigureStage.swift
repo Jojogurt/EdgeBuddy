@@ -68,7 +68,8 @@ extension View {
     /// use `isWaiting` while a modal is up.
     ///
     /// Tune it with `figureColor(_:)`, `figureOpacity(_:)`, `figureHeight(_:)`,
-    /// `figureHaptics(_:)` and `figureMotionEnabled(_:)`.
+    /// `figureHaptics(_:)` and `figureMotionEnabled(_:)`; pick who plays with
+    /// `figureCharacter(_:)` (``HumanFigure`` by default).
     ///
     /// - Parameters:
     ///   - isEnabled: false = no figure.
@@ -188,7 +189,6 @@ private struct FigureStageModifier: ViewModifier {
     @Environment(\.figureHapticsEnabled) private var hapticsEnabled
     @Environment(\.figureMotionOverride) private var motionOverride
     @Environment(\.figurePin) private var pin
-    @Environment(\.figureAppearance) private var appearance
     @Environment(\.figureCharacter) private var characterOverride
     @State private var scrolling = FigureScrollTracker()
     @State private var tapTick = 0
@@ -207,8 +207,7 @@ private struct FigureStageModifier: ViewModifier {
             .onScrollPhaseChange { old, new in scrolling.phaseChanged(from: old.isScrolling, to: new.isScrolling) }
             .overlayPreferenceValue(FigureAnchorsKey.self) { items in
                 if isEnabled, PeekingFigureMetrics.isShown(dynamicTypeSize: dynamicTypeSize) {
-                    // No character set: the human, drawn with the appearance.
-                    let character = characterOverride ?? HumanRig.character(HumanFigure(appearance: appearance))
+                    let character = characterOverride ?? HumanRig.character()
                     GeometryReader { proxy in
                         let origin = proxy.frame(in: .global).origin
                         let stage = CGRect(origin: .zero, size: proxy.size)

@@ -16,20 +16,26 @@ struct PlaygroundTab: View {
         }
     }
 
+    /// Three looks of the built-in `HumanFigure`, and a character of its own.
     private enum Head: String, CaseIterable {
         case circle = "Circle", bear = "🐻", star = "Star", ghost = "Ghost"
 
-        var figureHead: FigureHead {
+        /// The human with this head.
+        var human: HumanFigure {
             switch self {
-            case .circle: .circle
-            case .bear: .text("🐻")
-            case .star: .symbol("star.fill")
-            case .ghost: .circle
+            case .circle, .ghost: HumanFigure()
+            case .bear: HumanFigure(head: .text("🐻"), headScale: 1.5)
+            case .star: HumanFigure(head: .symbol("star.fill"), headScale: 1.5)
             }
+        }
+
+        var character: any FigureCharacter {
+            self == .ghost ? Ghost() : human
         }
     }
 
-    @State private var head = Head.circle
+    /// Launch with `-EdgeBuddyHead Ghost` (or 🐻, Star) to start with another figure.
+    @State private var head = Head(rawValue: UserDefaults.standard.string(forKey: "EdgeBuddyHead") ?? "") ?? .circle
     @State private var color = Color.green
     @State private var height: CGFloat = 56
     @State private var opacity = 1.0
@@ -70,8 +76,7 @@ struct PlaygroundTab: View {
                 loops: loops
             )
             .figureColor(color)
-            .figureAppearance(FigureAppearance(head: head.figureHead, headScale: head == .circle ? 1 : 1.5))
-            .ghost(head == .ghost)
+            .figureCharacter(head.character)
             .figureOpacity(opacity)
             .figureHeight(height)
             .figureHaptics(haptics)
@@ -108,17 +113,10 @@ struct PlaygroundTab: View {
         TimelineView(.animation) { context in
             RunningFigure(
                 phase: context.date.timeIntervalSinceReferenceDate / RunningFigure.cycleDuration,
-                color: color
+                color: color, figure: head.human
             )
         }
         .frame(width: 54, height: 56)
         .accessibilityLabel("Loading")
-    }
-}
-
-private extension View {
-    /// The ghost character instead of the default figure.
-    @ViewBuilder func ghost(_ on: Bool) -> some View {
-        if on { figureCharacter(Ghost()) } else { self }
     }
 }

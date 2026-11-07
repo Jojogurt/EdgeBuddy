@@ -14,7 +14,7 @@ project was generated from (`xcodegen generate` in this folder).
 
 | Tab | Shows |
 |---|---|
-| Playground | `figureStage` on a `ScrollView`; colour, height, opacity, tempo, entrance, appear delay, loops, haptics, `isWaiting`; `RunningFigure` as a loader |
+| Playground | `figureStage` on a `ScrollView`; colour, height, opacity, tempo, the character (`HumanFigure` with a circle, 🐻 or star head, or the `Ghost` from `Sources/Ghost.swift` — a `FigureCharacter` with its own pose, actions and drawing), entrance, appear delay, loops, haptics, `isWaiting`; `RunningFigure` as a loader |
 | Pinning | `figurePinned` with a stage on the whole screen: anchor, edge, pose, spot, animated |
 | Static | no `ScrollView` — the stage on a screen's `body` |
 | Single card | `peekingFigure()` for one-off cards |

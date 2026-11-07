@@ -5,8 +5,7 @@ import SwiftUI
 enum HumanRig {
     /// `figure` on the stage.
     static func character(_ figure: HumanFigure = HumanFigure()) -> AnyFigureCharacter {
-        let appearance = figure.appearance
-        return AnyFigureCharacter(
+        AnyFigureCharacter(
             typeID: ObjectIdentifier(HumanFigure.self),
             geometry: .human,
             actions: { edge, room, atScreenEdge in
@@ -19,7 +18,7 @@ enum HumanRig {
                 guard let timeline = play.base as? FigureTimeline else { return nil }
                 let pose = joints(timeline, at: time, edge: edge, heading: heading)
                 return FigureFrame(isOut: isOut(pose, at: edge)) { context, color in
-                    HumanDrawing.draw(pose, appearance: appearance, in: &context, color: color)
+                    HumanDrawing.draw(pose, figure: figure, in: &context, color: color)
                 }
             }
         )
@@ -74,14 +73,14 @@ enum HumanRig {
     }
 }
 
-/// Draws one frame of the human rig in the rig's grid: far limbs (faded in
+/// Draws one frame of `HumanFigure` in the rig's grid: far limbs (faded in
 /// profile), torso, head, near limbs.
 enum HumanDrawing {
-    static func draw(_ joints: FigureJoints, appearance: FigureAppearance, in context: inout GraphicsContext, color: Color) {
+    static func draw(_ joints: FigureJoints, figure: HumanFigure, in context: inout GraphicsContext, color: Color) {
         let skeleton = FigureSkeleton(joints)
         func shading(_ part: Color?) -> GraphicsContext.Shading { .color(part ?? color) }
         let limb = StrokeStyle(
-            lineWidth: FigureSkeleton.limbWidth * appearance.limbScale, lineCap: .round, lineJoin: .round
+            lineWidth: FigureSkeleton.limbWidth * figure.limbScale, lineCap: .round, lineJoin: .round
         )
         func polyline(_ points: [CGPoint]) -> Path {
             Path { $0.addLines(points) }
@@ -90,39 +89,39 @@ enum HumanDrawing {
         // One layer, so the far arm and leg fade as a whole where they cross.
         context.drawLayer { far in
             far.opacity = skeleton.farLimbOpacity
-            far.stroke(polyline(skeleton.legL), with: shading(appearance.legColor), style: limb)
-            far.stroke(polyline(skeleton.armL), with: shading(appearance.armColor), style: limb)
+            far.stroke(polyline(skeleton.legL), with: shading(figure.legColor), style: limb)
+            far.stroke(polyline(skeleton.armL), with: shading(figure.armColor), style: limb)
         }
-        context.stroke(polyline(skeleton.legR), with: shading(appearance.legColor), style: limb)
+        context.stroke(polyline(skeleton.legR), with: shading(figure.legColor), style: limb)
         context.stroke(
-            polyline([skeleton.hip, skeleton.torsoTop]), with: shading(appearance.torsoColor),
-            style: StrokeStyle(lineWidth: FigureSkeleton.torsoWidth * appearance.torsoScale, lineCap: .round)
+            polyline([skeleton.hip, skeleton.torsoTop]), with: shading(figure.torsoColor),
+            style: StrokeStyle(lineWidth: FigureSkeleton.torsoWidth * figure.torsoScale, lineCap: .round)
         )
-        drawHead(appearance, joints: joints, at: skeleton.head, in: &context, color: color)
-        context.stroke(polyline(skeleton.armR), with: shading(appearance.armColor), style: limb)
+        drawHead(figure, joints: joints, at: skeleton.head, in: &context, color: color)
+        context.stroke(polyline(skeleton.armR), with: shading(figure.armColor), style: limb)
     }
 
     private static func drawHead(
-        _ appearance: FigureAppearance, joints: FigureJoints, at head: CGPoint,
+        _ figure: HumanFigure, joints: FigureJoints, at head: CGPoint,
         in context: inout GraphicsContext, color: Color
     ) {
-        let tint = appearance.headColor ?? color
-        if case .circle = appearance.head {
-            let r = FigureSkeleton.headRadius * appearance.headScale
+        let tint = figure.headColor ?? color
+        if case .circle = figure.head {
+            let r = FigureSkeleton.headRadius * figure.headScale
             context.fill(
                 Path(ellipseIn: CGRect(x: head.x - r, y: head.y - r, width: 2 * r, height: 2 * r)),
                 with: .color(tint)
             )
             return
         }
-        let side = 2 * FigureSkeleton.headRadius * appearance.headScale
+        let side = 2 * FigureSkeleton.headRadius * figure.headScale
         // Tilts with the body (+ = clockwise); a left-facing figure leans the other way.
         let facing = joints.facing
         var layer = context
         layer.translateBy(x: head.x, y: head.y)
         layer.rotate(by: .degrees((joints.lean + joints.tilt) * (facing < 0 ? -1 : 1)))
-        if appearance.mirrorsHead { layer.scaleBy(x: facing, y: 1) }
-        switch appearance.head {
+        if figure.mirrorsHead { layer.scaleBy(x: facing, y: 1) }
+        switch figure.head {
         case .circle:
             break
         case .symbol(let name):

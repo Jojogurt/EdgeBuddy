@@ -213,4 +213,15 @@ extension View {
     public func figureCharacter(_ character: some FigureCharacter) -> some View {
         environment(\.figureCharacter, AnyFigureCharacter(character))
     }
+
+    /// `figureCharacter(_:)` for a character chosen at run time:
+    ///
+    /// ```swift
+    /// .figureCharacter(spooky ? Ghost() : HumanFigure() as any FigureCharacter)
+    /// ```
+    ///
+    /// - Parameter character: who plays.
+    public func figureCharacter(_ character: any FigureCharacter) -> some View {
+        environment(\.figureCharacter, AnyFigureCharacter(character))
+    }
 }

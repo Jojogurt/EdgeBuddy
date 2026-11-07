@@ -54,6 +54,30 @@ For a single card (onboarding, an empty state) use
 - ``SwiftUICore/View/figureHaptics(_:)``
 - ``SwiftUICore/View/figureMotionEnabled(_:)``
 
+### Characters
+
+The default character is ``HumanFigure``; its parameters change the look
+(head, thickness, colour per part). A type of your own conforming to
+``FigureCharacter`` brings its own pose model, actions per edge, boxes and
+drawing — a ghost without arms or legs, say. The stage keeps sequencing,
+layout, taps, Reduce Motion, Low Power Mode and pins.
+
+```swift
+.figureStage()
+.figureCharacter(HumanFigure(head: .text("🐻"), headScale: 1.4))
+```
+
+- `figureCharacter(_:)` (a concrete character, or `any FigureCharacter` chosen at run time)
+- ``HumanFigure``
+- ``FigureHead``
+- ``FigureCharacter``
+- ``FigureCharacterPose``
+- ``FigureCharacterAction``
+- ``FigureMotion``
+- ``FigureCharacterBox``
+- ``FigureEdge``
+- ``FigureSkeletonPoints``
+
 ### Snapshots & previews
 
 A pinned figure stands still in a known place — for App Store screenshots,
@@ -71,6 +95,9 @@ figure doesn't fit at that edge, the stage plays as without a pin. A single card
 - ``SwiftUICore/View/figurePinned(_:)``
 - ``FigurePin``
 - ``FigurePose``
+
+Pins name a character's action (``FigurePin/init(anchor:edge:action:spot:animated:)``);
+``FigurePose`` is the list of ``HumanFigure``'s.
 
 ### Building blocks
 
