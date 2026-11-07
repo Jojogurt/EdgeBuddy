@@ -22,6 +22,8 @@ struct PeekingFigureView: View {
     var metrics = PeekingFigureMetrics.standard
     /// Idle motion allowed (foreground, not Low Power) — gates the loop.
     var idleMotionEnabled = true
+    /// Pinned to one anchor, edge and pose (`figurePinned(_:)`); nil = free.
+    var pin: FigurePin?
     var onTap: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -62,6 +64,11 @@ struct PeekingFigureView: View {
     /// ducked mid-relocation (`previousEdge`).
     @State private var edge = FigureEdge.top
     @State private var previousEdge = FigureEdge.top
+    /// Showing the pin (`FigurePinnedPlay`): no loop, no taps, no random picks.
+    @State private var isPinned = false
+    /// The pinned hold frame, seconds into `timeline`: drawn while the clock
+    /// is stopped (`startDate` nil).
+    @State private var frozenElapsed: Double?
 
     var body: some View {
         TimelineView(.animation(paused: startDate == nil || isStill || !isOnScreen)) { context in
@@ -89,6 +96,8 @@ struct PeekingFigureView: View {
         .onAppear { appear() }
         .onDisappear {
             // The next appearance climbs in again.
+            isPinned = false
+            frozenElapsed = nil
             startDate = nil
             hasPlayed = false
             isPending = false
@@ -108,6 +117,16 @@ struct PeekingFigureView: View {
             isDelayingEntrance = false
             enter()
         }
+        .onChange(of: pin) {
+            // Pinned, moved or unpinned: start over.
+            isPinned = false
+            frozenElapsed = nil
+            isStill = false
+            isParked = false
+            isPending = false
+            playID += 1
+            appear()
+        }
         .onChange(of: isWaiting) { _, waiting in
             if !waiting, isPending {
                 isPending = false
@@ -118,6 +137,13 @@ struct PeekingFigureView: View {
             if !scrolling, isParked, !isWaiting { comeOut() }
         }
         .onChange(of: anchors.map(\.id)) { _, ids in
+            if isPinned, let anchorID, !ids.contains(anchorID) {
+                // The pinned card went away: free again until it is back.
+                isPinned = false
+                frozenElapsed = nil
+            }
+            if !isPinned, pin != nil, showPin() { return }
+            guard !isPinned else { return }
             if let anchorID, !ids.contains(anchorID) {
                 // Its card went away (another segment, out of a lazy stack):
                 // start over from behind another one, after the same wait
@@ -133,15 +159,22 @@ struct PeekingFigureView: View {
         }
         .onChange(of: viewport) {
             // Laid out for real (the first pass can be empty), or resized.
-            if isParked, !isWaiting { comeOut() }
+            if !isPinned, pin != nil, showPin() { return }
+            if isParked, !isWaiting, !isPinned { comeOut() }
         }
         .onChange(of: idleMotionEnabled) { _, enabled in
             // Idle motion back on (foreground, Low Power off): pick the loop up.
-            if enabled, canLoop, hasPlayed, startDate == nil, !isWaiting { resume() }
+            if enabled, !isPinned, canLoop, hasPlayed, startDate == nil, !isWaiting { resume() }
         }
         .task(id: playID) {
             guard let start = startDate else { return }
             let played = timeline
+            if isPinned, let hold = frozenElapsed {
+                // Pinned: play up to the hold frame and stop the clock there.
+                guard await sleep(until: start + hold) else { return }
+                startDate = nil
+                return
+            }
             // Stop the clock while the pose holds still.
             for window in played.stillWindows {
                 guard await sleep(until: start + window.lowerBound) else { return }
@@ -230,7 +263,9 @@ struct PeekingFigureView: View {
     }
 
     private func elapsed(at date: Date) -> Double {
-        startDate.map { date.timeIntervalSince($0) } ?? (hasPlayed ? .infinity : 0)
+        if let frozenElapsed, startDate == nil { return frozenElapsed }
+        if let frozenElapsed, let startDate { return min(date.timeIntervalSince(startDate), frozenElapsed) }
+        return startDate.map { date.timeIntervalSince($0) } ?? (hasPlayed ? .infinity : 0)
     }
 
     /// Anchor, edge and spot shown at `elapsed`: the old ones until hidden
@@ -303,7 +338,7 @@ struct PeekingFigureView: View {
     /// Duck behind the card, come out elsewhere (maybe on another card or
     /// edge), play a new action.
     private func tapped() {
-        guard !reduceMotion, !isWaiting else { return }
+        guard !reduceMotion, !isWaiting, !isPinned else { return }
         onTap()
         play(entrance: style.entrance, relocating: true)
     }
@@ -314,6 +349,8 @@ struct PeekingFigureView: View {
         isHidden = true
         anchorID = nil
         previousAnchorID = nil
+        // Pinned and its anchor fits: straight to it, no delay, no draws.
+        if pin != nil, showPin() { return }
         var generator = SystemRandomNumberGenerator()
         entranceDelay = style.entranceDelay(using: &generator)
         if entranceDelay > 0 {
@@ -324,6 +361,36 @@ struct PeekingFigureView: View {
             isDelayingEntrance = false
             enter()
         }
+    }
+
+    /// Shows the pin when its anchor is on screen and the figure fits at its
+    /// edge: comes out there (or shows the frame at once) and holds the
+    /// pose's hold frame. False = the pin doesn't fit now; nothing changed.
+    private func showPin() -> Bool {
+        guard let pin, let play = FigurePinnedPlay.resolve(
+            pin, anchors: anchors, viewport: viewport, metrics: metrics, style: style
+        ) else { return false }
+        isPinned = true
+        isDelayingEntrance = false
+        isParked = false
+        isPending = false
+        isStill = false
+        anchorID = play.anchor
+        previousAnchorID = play.anchor
+        edge = play.edge
+        previousEdge = play.edge
+        spot = play.spot
+        previousSpot = play.spot
+        walkTarget = play.spot
+        lastAction = play.action
+        timeline = play.timeline
+        frozenElapsed = play.holdTime
+        isHidden = false
+        hasPlayed = true
+        // Reduce Motion still gets the still frame, only without the motion.
+        startDate = pin.animated && !reduceMotion ? .now : nil
+        playID += 1
+        return true
     }
 
     /// The first entrance after appearing (once `appearDelay` is over).

@@ -723,6 +723,13 @@ struct FigureTimeline: Equatable, Sendable {
     /// how long it stays there before the next cycle, seconds.
     let hiddenPause: Double?
 
+    /// The action's signature frame, seconds from the start: where a pinned
+    /// figure (`FigurePin`) freezes — the arm up of the wave, the balance of
+    /// the handstand, the flag held out. nil under Reduce Motion (it only
+    /// stands) and for the travelling actions (the climb, the worm walk, the
+    /// run).
+    let holdTime: Double?
+
     /// How far below the rig's own ground line (grid y 84) the card's edge
     /// sits for the peeking figure (`FigureSkeleton.edgeY`): poses "behind
     /// the card" are this much lower, so the standing feet end on the edge.
@@ -788,6 +795,7 @@ struct FigureTimeline: Equatable, Sendable {
         let poses = FigureEdgePoses.self
         let repeats = variation.repeats ?? Self.canvasRepeats(action)
         var walk: ClosedRange<Double>?
+        var signature: Double?
 
         if reduceMotion {
             frames.append(Keyframe(time: 0, joints: rest, easing: .inOut))
@@ -799,6 +807,7 @@ struct FigureTimeline: Equatable, Sendable {
             walkWindow = nil
             walkDistance = nil
             hiddenPause = nil
+            holdTime = nil
             return
         }
 
@@ -852,23 +861,27 @@ struct FigureTimeline: Equatable, Sendable {
                     at(0.3, rest, limbs: Self.peekGrip)
                 }
             }
+            signature = time
         case .swing:
             at(0.42, poses.swingRight, limbs: poses.hangGrips)
-            for _ in 0..<repeats {
+            for round in 0..<repeats {
                 at(0.56, poses.swingLeft, limbs: poses.hangGrips)
+                if round == 0 { signature = time }
                 at(0.56, poses.swingRight, limbs: poses.hangGrips)
             }
             at(0.5, rest, limbs: poses.hangGrips)
         case .pullUp:
-            for _ in 0..<repeats {
+            for round in 0..<repeats {
                 at(0.3, poses.pullMid, limbs: poses.hangGrips)
                 at(0.16, poses.pullTop, limbs: poses.hangGrips)
+                if round == 0 { signature = time }
                 at(0.14, poses.pullTop, limbs: poses.hangGrips)
                 at(0.42, rest, limbs: poses.hangGrips)
             }
         case .peek:
-            for _ in 0..<repeats {
+            for round in 0..<repeats {
                 at(0.35, poses.peekOut, limbs: Self.peekGrip)
+                if round == 0 { signature = time }
                 at(0.3, poses.peekLook, limbs: Self.peekGrip)
                 at(0.25, poses.peekOut, limbs: Self.peekGrip)
                 at(0.35, rest, limbs: Self.peekGrip)
@@ -883,6 +896,7 @@ struct FigureTimeline: Equatable, Sendable {
                 at(0.4, poses.flagSwing, limbs: .hands)
                 at(0.35, poses.flagA, limbs: .hands)
             }
+            signature = time
             for _ in 0..<repeats {
                 at(0.22, poses.flagB, limbs: .hands)
                 at(0.22, poses.flagA, limbs: .hands)
@@ -906,6 +920,7 @@ struct FigureTimeline: Equatable, Sendable {
                 $0.armL = -8; $0.elbowL = 4; $0.armR = 148; $0.elbowR = -18; $0.tilt = -7
             }
             at(0.3, up)
+            signature = time
             for _ in 0..<repeats {
                 at(0.2, up.with { $0.elbowR = 24 })
                 at(0.2, up.with { $0.elbowR = -34 })
@@ -922,9 +937,10 @@ struct FigureTimeline: Equatable, Sendable {
             }
             let air = closed.interpolated(to: open, 0.5).with { $0.y = -9 }
             at(0.22, closed)
-            for _ in 0..<repeats {
+            for round in 0..<repeats {
                 at(0.15, air)
                 at(0.15, open)
+                if round == 0 { signature = time }
                 at(0.15, air)
                 at(0.15, closed)
             }
@@ -943,6 +959,7 @@ struct FigureTimeline: Equatable, Sendable {
             for round in 0..<repeats {
                 if round > 0 { at(0.45, up) }
                 at(0.55, toLeft)
+                if round == 0 { signature = time }
                 at(0.45, toLeft)
                 at(0.45, up)
                 at(0.55, toRight)
@@ -965,8 +982,9 @@ struct FigureTimeline: Equatable, Sendable {
                 $0.y = -3; $0.tilt = -4
             }
             at(0.25, neutral)
-            for _ in 0..<repeats {
+            for round in 0..<repeats {
                 at(0.22, leftUp)
+                if round == 0 { signature = time }
                 at(0.18, neutral)
                 at(0.22, rightUp)
                 at(0.18, neutral)
@@ -994,6 +1012,7 @@ struct FigureTimeline: Equatable, Sendable {
             at(0.36, poses.handstandCartwheel, limbs: poses.handstandLunge)
             at(0.3, poses.handstandKick, limbs: .hands)
             at(0.3, poses.handstand, limbs: .hands)
+            signature = time
             for _ in 0..<repeats {
                 at(0.32, poses.handstandWobbleL, limbs: .hands)
                 at(0.32, poses.handstandWobbleR, limbs: .hands)
@@ -1033,6 +1052,7 @@ struct FigureTimeline: Equatable, Sendable {
             walkDistance = nil
         }
         walkWindow = walk
+        holdTime = signature
     }
 
     /// The peek's hand on the card's edge holds on (`FigureEdgePoses.peek`).

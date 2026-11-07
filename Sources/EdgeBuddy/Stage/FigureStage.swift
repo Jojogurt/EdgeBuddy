@@ -98,7 +98,8 @@ extension View {
     }
 }
 
-private enum SoloAnchor: Hashable {
+/// The single anchor of `peekingFigure` (`FigurePin.singleCard`).
+enum SoloAnchor: Hashable, Sendable {
     case id
 }
 
@@ -127,6 +128,7 @@ private struct FigureStageModifier: ViewModifier {
     @Environment(\.figureHeight) private var height
     @Environment(\.figureHapticsEnabled) private var hapticsEnabled
     @Environment(\.figureMotionOverride) private var motionOverride
+    @Environment(\.figurePin) private var pin
     @State private var isScrolling = false
     @State private var tapTick = 0
     @State private var lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
@@ -158,6 +160,7 @@ private struct FigureStageModifier: ViewModifier {
                             color: color,
                             metrics: PeekingFigureMetrics(height: height),
                             idleMotionEnabled: idleMotionEnabled,
+                            pin: pin,
                             onTap: { tapTick += 1 }
                         )
                     }

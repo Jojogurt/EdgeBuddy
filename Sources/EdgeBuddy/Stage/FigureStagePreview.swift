@@ -2,6 +2,23 @@ import SwiftUI
 
 #Preview("Stage") { FigureStagePreview() }
 #Preview("Stage — dark") { FigureStagePreview().preferredColorScheme(.dark) }
+#Preview("Pinned — flag on the hero") {
+    FigureStagePreview()
+        .figurePinned(FigurePin(anchor: "hero", edge: .trailing, pose: .flag, spot: 0.3, animated: false))
+}
+#Preview("Pinned — handstand") {
+    FigureStagePreview()
+        .figurePinned(FigurePin(anchor: "second", edge: .top, pose: .handstand, spot: 0.8))
+}
+#Preview("Pinned — single card") {
+    RoundedRectangle(cornerRadius: 24)
+        .fill(.quaternary)
+        .frame(height: 140)
+        .peekingFigure()
+        .figurePinned(.singleCard(pose: .wave, spot: 0.7, animated: false))
+        .padding()
+        .figureColor(.green)
+}
 
 private struct FigureStagePreview: View {
     var body: some View {

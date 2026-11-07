@@ -6,6 +6,12 @@ change in minor releases.
 
 ## Unreleased
 
+- **Pinned figure** for screenshots, previews and snapshot tests:
+  `figurePinned(_:)` with `FigurePin(anchor:edge:pose:spot:animated:)` and the
+  public `FigurePose`. No entrance delay, no random picks, no loop, no tap
+  relocation; it plays the pose and freezes at its hold frame, also under
+  Reduce Motion and Low Power Mode. Falls back to the free stage while the
+  anchor is off screen or the figure doesn't fit at that edge.
 - Top edge: the walk is replaced by a caterpillar **worm walk** (in profile,
   lying on the edge; travels exactly as far as its hands and feet carry it)
   and a new **handstand** (half a cartwheel onto the hands, a balance wobble).

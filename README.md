@@ -183,6 +183,34 @@ TimelineView(.animation) { context in
 .accessibilityLabel("Loading")
 ```
 
+## Snapshots & previews
+
+For App Store screenshots, Xcode previews and snapshot tests the figure has
+to stand still in a known place. Pin it:
+
+```swift
+ScrollView { … }
+    .figureStage()
+    .figurePinned(FigurePin(anchor: "hero", edge: .trailing, pose: .flag))
+```
+
+With a pin the stage skips the entrance delay and every random pick: the
+figure comes out at that edge of that anchor (whatever edges the anchor
+allows), plays the pose and freezes at its hold frame. It never loops,
+ignores taps, and holds the frame also under Reduce Motion, in Low Power Mode
+and with idle motion off. Pass `animated: false` to show the hold frame at
+once, without the entrance — the steadiest choice for snapshots — and `spot`
+(0…1, default 0.5) to move it along the edge.
+
+`FigurePose` lists the poses with a clear still frame: `.rest` (every edge),
+`.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand` (top),
+`.swing`, `.pullUp` (bottom), `.peek`, `.flag` (sides). A pose pinned at an
+edge it isn't played at rests there. If the anchor is not on screen or the
+figure doesn't fit at that edge, the stage plays as without a pin and takes
+the pin up as soon as it fits. `figurePinned(nil)` lets it play freely again.
+For a single card (`peekingFigure`) use
+`.figurePinned(.singleCard(pose: .wave))` — its anchor has no id of yours.
+
 ## Accessibility
 
 - The figure is decoration: hidden from VoiceOver, and it never takes taps

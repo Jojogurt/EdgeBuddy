@@ -54,6 +54,24 @@ For a single card (onboarding, an empty state) use
 - ``SwiftUICore/View/figureHaptics(_:)``
 - ``SwiftUICore/View/figureMotionEnabled(_:)``
 
+### Snapshots & previews
+
+A pinned figure stands still in a known place — for App Store screenshots,
+Xcode previews and snapshot tests: no entrance delay, no random picks, no
+loop, no taps; it plays the pose and freezes at its hold frame (also under
+Reduce Motion and Low Power Mode). When the anchor is off screen or the
+figure doesn't fit at that edge, the stage plays as without a pin. A single card
+(`peekingFigure`) takes ``FigurePin/singleCard(edge:pose:spot:animated:)``.
+
+```swift
+.figureStage()
+.figurePinned(FigurePin(anchor: "hero", edge: .trailing, pose: .flag, animated: false))
+```
+
+- ``SwiftUICore/View/figurePinned(_:)``
+- ``FigurePin``
+- ``FigurePose``
+
 ### Building blocks
 
 - ``RunningFigure``
