@@ -188,6 +188,7 @@ private struct FigureStageModifier: ViewModifier {
     @Environment(\.figureHapticsEnabled) private var hapticsEnabled
     @Environment(\.figureMotionOverride) private var motionOverride
     @Environment(\.figurePin) private var pin
+    @Environment(\.figureAppearance) private var appearance
     @State private var scrolling = FigureScrollTracker()
     @State private var tapTick = 0
     @State private var lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
@@ -205,6 +206,7 @@ private struct FigureStageModifier: ViewModifier {
             .onScrollPhaseChange { old, new in scrolling.phaseChanged(from: old.isScrolling, to: new.isScrolling) }
             .overlayPreferenceValue(FigureAnchorsKey.self) { items in
                 if isEnabled, PeekingFigureMetrics.isShown(dynamicTypeSize: dynamicTypeSize) {
+                    let character = HumanRig.character(appearance)
                     GeometryReader { proxy in
                         let origin = proxy.frame(in: .global).origin
                         let stage = CGRect(origin: .zero, size: proxy.size)
@@ -222,7 +224,8 @@ private struct FigureStageModifier: ViewModifier {
                             isWaiting: isWaiting,
                             loops: loops,
                             color: color,
-                            metrics: PeekingFigureMetrics(height: height),
+                            character: character,
+                            metrics: PeekingFigureMetrics(height: height, geometry: character.geometry),
                             idleMotionEnabled: idleMotionEnabled,
                             lowPowerMode: lowPowerMode,
                             pin: pin?.physical(for: layoutDirection),

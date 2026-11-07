@@ -47,6 +47,8 @@ public struct RunningFigure: View {
     }
 
     public var body: some View {
-        FigureCanvas(joints: .run(phase: phase), color: color, appearance: appearance, viewBox: viewBox)
+        FigureCanvas(color: color, viewBox: viewBox) { [appearance, phase] context, color in
+            HumanDrawing.draw(.run(phase: phase), appearance: appearance, in: &context, color: color)
+        }
     }
 }

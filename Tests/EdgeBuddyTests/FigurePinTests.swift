@@ -45,7 +45,7 @@ struct FigurePinTests {
         // "stats" only allows the top; the pin still goes to its trailing side.
         let play = try #require(resolve(FigurePin(anchor: "stats", edge: .trailing, pose: .flag)))
         #expect(play.edge == .trailing)
-        #expect(play.action == .flag)
+        #expect(play.action == FigureAction.flag.name)
     }
 
     @Test("Several edges: the first of top, bottom, leading, trailing; none = top")
@@ -76,7 +76,7 @@ struct FigurePinTests {
             FigurePin(anchor: 7, pose: .handstand), anchors: solo, viewport: nil, metrics: metrics, style: style
         ))
         #expect(play.edge == .top)
-        #expect(play.action == .handstand)
+        #expect(play.action == FigureAction.handstand.name)
     }
 
     @Test("The spot is the pin's, clamped to 0…1; default the middle")
@@ -89,9 +89,9 @@ struct FigurePinTests {
 
     @Test("A pose of another edge rests there")
     func poseOfAnotherEdge() throws {
-        #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .bottom, pose: .wave))).action == .rest)
-        #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .top, pose: .flag))).action == .rest)
-        #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .leading, pose: .pullUp))).action == .rest)
+        #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .bottom, pose: .wave))).action == FigureAction.rest.name)
+        #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .top, pose: .flag))).action == FigureAction.rest.name)
+        #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .leading, pose: .pullUp))).action == FigureAction.rest.name)
         for pose in FigurePose.allCases {
             for edge in FigureEdge.allCases where pose.edges.contains(edge.member) {
                 if pose != .rest { #expect(pose.action(at: edge) != .rest) }
@@ -121,7 +121,7 @@ struct FigurePinTests {
     func topHoldFrames() throws {
         func held(_ pose: FigurePose) throws -> FigureJoints {
             let play = try #require(resolve(FigurePin(anchor: "hero", pose: pose)))
-            return play.timeline.joints(at: play.holdTime)
+            return try #require(play.timeline.joints(at: play.holdTime))
         }
         #expect(try held(.wave).armR == 148)
         #expect(try held(.jumpingJacks).armL == -150)
@@ -157,9 +157,16 @@ struct FigurePinSingleCardTests {
             .singleCard(pose: .wave), anchors: solo, viewport: nil, metrics: .standard, style: .standard
         ))
         #expect(play.anchor == AnyHashable(SoloAnchor.id))
-        #expect(play.action == .wave)
+        #expect(play.action == FigureAction.wave.name)
         #expect(FigurePinnedPlay.resolve(
             FigurePin(anchor: "hero", pose: .wave), anchors: solo, viewport: nil, metrics: .standard, style: .standard
         ) == nil)
+    }
+}
+
+/// The human rig's pose of a type-erased play.
+extension FigurePlay {
+    func joints(at time: Double) -> FigureJoints? {
+        (base as? FigureTimeline)?.joints(at: time)
     }
 }

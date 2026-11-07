@@ -3,7 +3,7 @@ import Foundation
 
 /// What the peeking figure does after it steps onto the card's edge. The
 /// stage draws one at random each cycle (`FigureRepertoire`).
-enum FigureAction: Equatable, Sendable {
+enum FigureAction: CaseIterable, Equatable, Sendable {
     /// Hands on hips, a short nod — the resting state every action ends in.
     case rest
     /// A greeting.
@@ -35,6 +35,15 @@ enum FigureAction: Equatable, Sendable {
     /// Side edge: turns to the card and climbs up the outside of its edge
     /// hand over hand (`FigureTimeline.walkDistance`).
     case climb
+
+    /// The action's name, as the stage and pins refer to it (`FigurePin.action`).
+    var name: String { String(describing: self) }
+
+    /// The action called `name`; nil = no such action.
+    init?(name: String) {
+        guard let action = Self.allCases.first(where: { $0.name == name }) else { return nil }
+        self = action
+    }
 }
 
 /// The edge of an anchor the figure is at. Top: stands on it, the rest
@@ -105,9 +114,16 @@ struct FigureVariation: Equatable, Sendable {
     static func random(
         for action: FigureAction, exit: FigureEntrance, using generator: inout some RandomNumberGenerator
     ) -> FigureVariation {
+        random(repeats: repeatRange(action), exit: exit, using: &generator)
+    }
+
+    /// One looped cycle of an action repeated within `repeats`, leaving with `exit`.
+    static func random(
+        repeats: ClosedRange<Int>, exit: FigureEntrance, using generator: inout some RandomNumberGenerator
+    ) -> FigureVariation {
         FigureVariation(
             holdBefore: .random(in: holdBeforeRange, using: &generator),
-            repeats: .random(in: repeatRange(action), using: &generator),
+            repeats: .random(in: repeats, using: &generator),
             holdAfter: .random(in: holdAfterRange, using: &generator),
             exit: exit,
             hiddenPause: .random(in: hiddenPauseRange, using: &generator),
@@ -1461,8 +1477,17 @@ enum FigureRepertoire {
         after previous: FigureAction?, from actions: [FigureAction] = top,
         using generator: inout some RandomNumberGenerator
     ) -> FigureAction {
+        next(after: previous, from: actions, fallback: .rest, using: &generator)
+    }
+
+    /// A random one of `actions` (of any character), never `previous` twice
+    /// in a row unless it is the only one; `fallback` when there are none.
+    static func next<Action: Equatable>(
+        after previous: Action?, from actions: [Action], fallback: Action,
+        using generator: inout some RandomNumberGenerator
+    ) -> Action {
         let fresh = actions.filter { $0 != previous }
-        return (fresh.isEmpty ? actions : fresh).randomElement(using: &generator) ?? .rest
+        return (fresh.isEmpty ? actions : fresh).randomElement(using: &generator) ?? fallback
     }
 }
 

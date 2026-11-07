@@ -36,6 +36,15 @@ public enum FigurePose: CaseIterable, Hashable, Sendable {
         }
     }
 
+    /// The pose's name — the same as the rig's action it plays.
+    var name: String { String(describing: self) }
+
+    /// The pose called `name`; nil = no such pose.
+    init?(name: String) {
+        guard let pose = Self.allCases.first(where: { $0.name == name }) else { return nil }
+        self = pose
+    }
+
     /// The rig's action for this pose at `edge`: the pose where it is played,
     /// else the edge's rest.
     func action(at edge: FigureEdge) -> FigureAction {
@@ -164,8 +173,10 @@ struct FigurePinnedPlay: Equatable {
     let edge: FigureEdge
     /// Spot along the edge (`FigurePlacement`), within the part on screen.
     let spot: Double
-    let action: FigureAction
-    let timeline: FigureTimeline
+    /// The action's name (`FigureActionName.rest` when the character does
+    /// not play the pinned one at this edge).
+    let action: String
+    let timeline: FigurePlay
     /// Seconds from the start where it freezes.
     let holdTime: Double
 
@@ -174,7 +185,7 @@ struct FigurePinnedPlay: Equatable {
     /// nil = fall back to the free stage.
     static func resolve(
         _ pin: FigurePin, anchors: [FigureAnchorFrame], viewport stage: CGRect?,
-        metrics: PeekingFigureMetrics, style: FigureStyle
+        metrics: PeekingFigureMetrics, style: FigureStyle, character: AnyFigureCharacter = HumanRig.character()
     ) -> FigurePinnedPlay? {
         let edge = pin.figureEdge
         guard let frame = anchors.first(where: { $0.id == pin.anchor }) else { return nil }
@@ -183,11 +194,11 @@ struct FigurePinnedPlay: Equatable {
         guard FigureAnchorPicker.isEligible(rect: frame.rect, edge: edge, viewport: viewport, sizes: metrics.sizes)
         else { return nil }
         let range = metrics.spotRange(at: edge, on: frame.rect, viewport: viewport)
-        let action = pin.pose.action(at: edge)
-        let timeline = FigureTimeline(
+        let action = character.pinnedAction(pin.pose.name, at: edge)
+        let timeline = character.play(FigurePlayRequest(
             action: action, entrance: pin.animated ? style.entrance : nil, reduceMotion: false,
             edge: edge, tempo: style.tempo
-        )
+        ))
         return FigurePinnedPlay(
             anchor: frame.id, edge: edge,
             spot: min(max(pin.spot, range.lowerBound), range.upperBound),

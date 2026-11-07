@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// The animated rig of a stage (`figureStage` / `peekingFigure`): one figure
-/// on a strip as wide as its current anchor, above the anchor's top edge.
-/// Drawn in `FigureSkeleton.peekBox`, clipped at the anchor's edge (grid y
-/// `FigureSkeleton.edgeY`), so whatever is "behind the card" never shows — also over
-/// transparent (dashed) cards.
+/// The animated character of a stage (`figureStage` / `peekingFigure`): one
+/// figure in a box at its current anchor's edge (above the top, under the
+/// bottom, beside a side). Drawn in the character's box for that edge
+/// (`FigureGeometry`), clipped there, so whatever is "behind the card" never
+/// shows — also over transparent (dashed) cards.
 ///
 /// Free of app styling: colour, idle-motion policy and the tap feedback come
 /// in from the stage.
@@ -20,6 +20,8 @@ struct PeekingFigureView: View {
     var isWaiting = false
     var loops = false
     var color: Color
+    /// Who plays: poses, actions, boxes and drawing (the human rig by default).
+    var character = HumanRig.character()
     /// Sizes at the stage's figure height.
     var metrics = PeekingFigureMetrics.standard
     /// Idle motion allowed (foreground, not Low Power) — gates the loop.
@@ -31,11 +33,10 @@ struct PeekingFigureView: View {
     var pin: FigurePin?
     var onTap: () -> Void = {}
 
-    @Environment(\.figureAppearance) private var appearance
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Hidden behind the card until the first play starts.
-    @State private var timeline = FigureTimeline(action: .rest, entrance: .climb, reduceMotion: false)
+    @State private var timeline = FigurePlay.idle
     @State private var startDate: Date?
     @State private var hasPlayed = false
     /// A play is owed: it waits for a celebration to end.
@@ -59,7 +60,7 @@ struct PeekingFigureView: View {
     @State private var anchorID: AnyHashable?
     @State private var previousAnchorID: AnyHashable?
     /// The last action drawn — the next one differs.
-    @State private var lastAction: FigureAction?
+    @State private var lastAction: String?
     /// Spots along the edge (`FigurePlacement`) for the current play: where
     /// it stood (`previousSpot`, until hidden mid-relocation), where it pops
     /// up (`spot`) and where a walk ends (`walkTarget`).
@@ -84,22 +85,23 @@ struct PeekingFigureView: View {
             if let rect = place.anchor.flatMap(rect(for:)) {
                 // Only the part of the stage the anchor's scroll view shows.
                 let visible = viewport(for: place.anchor)
-                let pose = joints(at: elapsed, edge: place.edge)
-                let frame = figureFrame(at: place.edge, spot: place.spot, on: rect)
-                FigureCanvas(joints: pose, color: color, appearance: appearance, viewBox: PeekingFigureMetrics.box(for: place.edge))
-                    .opacity(timeline.opacity(at: elapsed))
-                    .frame(width: frame.width, height: frame.height)
-                    // Whatever is behind the card (past the box) never shows.
-                    .clipped()
-                    .contentShape(Rectangle())
-                    // Sides are drawn at the trailing edge; leading mirrors it.
-                    .scaleEffect(x: place.edge == .leading ? -1 : 1, y: 1)
-                    .onTapGesture { tapped() }
-                    // Only the figure itself takes taps, and only once it is
-                    // out — never the content it covers.
-                    .allowsHitTesting(Self.isOut(pose, at: place.edge))
-                    .position(x: frame.midX, y: frame.midY)
-                    .clipShape(FigureRegionClip(rect: visible))
+                if let figure = character.frame(timeline, at: elapsed, edge: place.edge, heading: walkTarget - spot) {
+                    let frame = figureFrame(at: place.edge, spot: place.spot, on: rect)
+                    FigureCanvas(color: color, viewBox: metrics.box(for: place.edge), draw: figure.draw)
+                        .opacity(timeline.opacity(at: elapsed))
+                        .frame(width: frame.width, height: frame.height)
+                        // Whatever is behind the card (past the box) never shows.
+                        .clipped()
+                        .contentShape(Rectangle())
+                        // Sides are drawn at the trailing edge; leading mirrors it.
+                        .scaleEffect(x: (place.edge == .leading) != figure.isMirrored ? -1 : 1, y: 1)
+                        .onTapGesture { tapped() }
+                        // Only the figure itself takes taps, and only once it is
+                        // out — never the content it covers.
+                        .allowsHitTesting(figure.isOut)
+                        .position(x: frame.midX, y: frame.midY)
+                        .clipShape(FigureRegionClip(rect: visible))
+                }
             }
         }
         .accessibilityHidden(true)
@@ -126,6 +128,10 @@ struct PeekingFigureView: View {
             guard !Task.isCancelled, isDelayingEntrance else { return }
             isDelayingEntrance = false
             enter()
+        }
+        .onChange(of: character.typeID) {
+            // Another character: its plays differ, start over.
+            restart()
         }
         .onChange(of: pin) {
             // Pinned, moved or unpinned: start over.
@@ -181,7 +187,7 @@ struct PeekingFigureView: View {
                 _ = showPin()
             } else if reduced {
                 // Mid-action: settle into the rest pose now, no waiting it out.
-                if startDate != nil, !isHidden { play(entrance: nil, action: .rest) }
+                if startDate != nil, !isHidden { play(entrance: nil, action: FigureActionName.rest) }
             } else if canLoop, hasPlayed, startDate == nil, !isWaiting {
                 resume()
             }
@@ -219,9 +225,20 @@ struct PeekingFigureView: View {
                 comeOut()
             } else {
                 // Idle motion went off mid-cycle: come back and stay standing.
-                comeOut(action: .rest)
+                comeOut(action: FigureActionName.rest)
             }
         }
+    }
+
+    /// Back behind the cards, then out again as after appearing.
+    private func restart() {
+        isPinned = false
+        frozenElapsed = nil
+        isStill = false
+        isParked = false
+        isPending = false
+        playID += 1
+        appear()
     }
 
     /// Changes whenever the anchors' ids (or their order) do — not their
@@ -266,15 +283,6 @@ struct PeekingFigureView: View {
         loops && idleMotionEnabled && !reduceMotion && !lowPowerMode
     }
 
-    /// The figure is out from behind its card (or edge) far enough to tap.
-    private static func isOut(_ pose: FigureJoints, at edge: FigureEdge) -> Bool {
-        switch edge {
-        case .top: pose.y < 40
-        case .bottom: pose.y > -40
-        case .leading, .trailing: pose.x > 44
-        }
-    }
-
     private func rect(for id: AnyHashable) -> CGRect? {
         anchors.first { $0.id == id }?.rect
     }
@@ -290,7 +298,9 @@ struct PeekingFigureView: View {
                 fraction: spot, cardWidth: rect.width,
                 figureWidth: size.width, margin: metrics.edgeMargin
             )
-            let y = edge == .top ? rect.minY - size.height : rect.maxY
+            // The box's edge line on the card's edge (the human's box ends there).
+            let overlap = metrics.edgeOverlap(at: edge)
+            let y = edge == .top ? rect.minY - size.height + overlap : rect.maxY - overlap
             return CGRect(x: rect.maxX - inset - size.width, y: y, width: size.width, height: size.height)
         case .leading, .trailing:
             let top = FigurePlacement.sideTop(
@@ -298,7 +308,8 @@ struct PeekingFigureView: View {
                 boxHeight: size.height, margin: metrics.sideMargin
             )
             // Outside the card, overlapping its edge by the gripping hands.
-            let x = edge == .trailing ? rect.maxX - metrics.sideOverlap : rect.minX + metrics.sideOverlap - size.width
+            let overlap = metrics.sideOverlap(at: edge)
+            let x = edge == .trailing ? rect.maxX - overlap : rect.minX + overlap - size.width
             return CGRect(x: x, y: top, width: size.width, height: size.height)
         }
     }
@@ -335,27 +346,14 @@ struct PeekingFigureView: View {
         return (anchorID, edge, spot)
     }
 
-    /// The pose; on the top it leans a little into the walk, and a run to
-    /// the left is mirrored (the turn blends with `profile`).
-    private func joints(at elapsed: Double, edge: FigureEdge) -> FigureJoints {
-        var joints = FigureSignpost.interval("joints") { timeline.joints(at: elapsed) }
-        guard edge == .top else { return joints }
-        if let progress = timeline.walkProgress(at: elapsed), walkTarget != spot, joints.profile == 0 {
-            // Fraction grows to the right; lean + = right.
-            joints.lean += (walkTarget > spot ? 5 : -5) * sin(progress * .pi)
-        }
-        if walkTarget < spot {
-            // Mirrored around the box's middle, not the hip: poses off the
-            // middle (the worm) stay inside the box.
-            joints.facing = 1 - 2 * joints.profile
-            joints.x *= joints.facing
-        }
-        return joints
+    /// Edges it may use now: those the character plays at while it loops,
+    /// else only the top (one entrance and standing) — or, for a character
+    /// without a top, its other edges.
+    private var allowedEdges: FigureEdges {
+        let supported = character.geometry.supportedEdges
+        if canLoop { return supported }
+        return supported.contains(.top) ? .top : supported
     }
-
-    /// Edges it may use now: all of them while it loops, else only the top
-    /// (one entrance and standing).
-    private var allowedEdges: FigureEdges { canLoop ? .all : .top }
 
     /// A random anchor and edge fully on screen: one where it can play
     /// something other than `lastAction`, on another anchor than `current`
@@ -385,14 +383,20 @@ struct PeekingFigureView: View {
     /// What it may play at `edge` of `rect` starting at `spot` (nil = it
     /// pops up and picks the spot): the edge's repertoire with the room to
     /// travel there — only the climb at a side by the screen's edge.
-    private func actions(at edge: FigureEdge, on rect: CGRect, anchor: AnyHashable?, from spot: Double?) -> [FigureAction] {
+    private func actions(at edge: FigureEdge, on rect: CGRect, anchor: AnyHashable?, from spot: Double?) -> [String] {
         let visible = viewport(for: anchor)
-        return FigureRepertoire.actions(
-            for: edge, room: metrics.travelRoom(at: edge, on: rect, viewport: visible, from: spot),
+        return character.actions(
+            at: edge, room: metrics.travelRoom(at: edge, on: rect, viewport: visible, from: spot),
             atScreenEdge: FigureAnchorPicker.isAtScreenEdge(
                 rect: rect, edge: edge, viewport: visible, gap: metrics.screenEdgeGap
             )
         )
+    }
+
+    /// Where it comes out when nothing is picked and the current edge is not
+    /// allowed: the top, or the character's first edge without a top.
+    private var fallbackEdge: FigureEdge {
+        FigureEdge.allCases.first { allowedEdges.contains($0.member) } ?? .top
     }
 
     /// Duck behind the card, come out elsewhere (maybe on another card or
@@ -457,7 +461,7 @@ struct PeekingFigureView: View {
     private func enter() {
         if isWaiting {
             // Come out and rest; the cycle carries on after the celebration.
-            comeOut(action: .rest)
+            comeOut(action: FigureActionName.rest)
             isPending = true
         } else {
             comeOut()
@@ -471,7 +475,7 @@ struct PeekingFigureView: View {
 
     /// From behind the cards: out from behind a visible anchor — or wait
     /// (`isParked`) while scrolling or when none is fully on screen.
-    private func comeOut(action override: FigureAction? = nil) {
+    private func comeOut(action override: String? = nil) {
         // Already out (two triggers in one update), or still waiting out the
         // first entrance's delay: nothing to do.
         guard isHidden, !isDelayingEntrance else { return }
@@ -483,12 +487,12 @@ struct PeekingFigureView: View {
         play(entrance: style.entrance, action: override)
     }
 
-    private func play(entrance: FigureEntrance?, action override: FigureAction? = nil, relocating: Bool = false) {
+    private func play(entrance: FigureEntrance?, action override: String? = nil, relocating: Bool = false) {
         var generator = SystemRandomNumberGenerator()
         // Start from wherever the figure is right now (mid-walk included).
         let current = position(at: elapsed(at: .now))
         // A tap mid-climb leaves the way the climb does, from the pose shown.
-        let shownPose = timeline.joints(at: elapsed(at: .now))
+        let shownPose = timeline.anyPose(at: elapsed(at: .now))
         previousSpot = current.spot
         previousAnchorID = current.anchor
         previousEdge = current.edge
@@ -497,7 +501,7 @@ struct PeekingFigureView: View {
         if popsUp {
             let next = pick(excluding: current.anchor, edge: current.edge)
             anchorID = next?.id ?? current.anchor
-            edge = next?.edge ?? (allowedEdges.contains(current.edge.member) ? current.edge : .top)
+            edge = next?.edge ?? (allowedEdges.contains(current.edge.member) ? current.edge : fallbackEdge)
         }
         let rect = anchorID.flatMap(rect(for:))
         let visible = viewport(for: anchorID)
@@ -509,23 +513,29 @@ struct PeekingFigureView: View {
         } ?? 0
         // Low Power Mode: no action, only the rest pose (and its entrance).
         // Never the last action again while the edge has another.
-        let played: FigureAction
+        let played: String
         if lowPowerMode {
-            played = .rest
+            played = FigureActionName.rest
         } else if let override {
             played = override
         } else {
             let available = rect.map { actions(at: edge, on: $0, anchor: anchorID, from: popsUp ? nil : current.spot) }
-                ?? FigureRepertoire.actions(for: edge, room: room)
-            played = FigureRepertoire.next(after: lastAction, from: available, using: &generator)
+                ?? character.actions(at: edge, room: room, atScreenEdge: false)
+            played = FigureRepertoire.next(
+                after: lastAction, from: available, fallback: FigureActionName.rest, using: &generator
+            )
         }
         lastAction = played
+        let info = character.info(played, at: edge)
+        // A side's travelling action (the human's climb) goes up to the top
+        // of the visible side, every cycle that fits.
+        let travelsToTop = edge.isSide && (info.travelPerBeat ?? 0) > 0
         let span = rect.map { metrics.travelSpan(at: edge, on: $0) } ?? 0
         if popsUp {
-            if played == .climb {
+            if travelsToTop {
                 // As many whole cycles as the visible side holds, starting
                 // that far below its top — so the climb always ends at the top.
-                let beat = FigureTimeline.travel(.climb, repeats: 1) ?? 1
+                let beat = info.travelPerBeat ?? 1
                 let cycles = max(1, Int((room + 1e-9) / beat))
                 spot = FigurePlacement.travelTarget(
                     from: range.lowerBound, distance: Double(cycles) * beat, direction: 1, scale: metrics.scale, span: span
@@ -540,22 +550,22 @@ struct PeekingFigureView: View {
         }
         spot = min(max(spot, range.lowerBound), range.upperBound)
         var variation = canLoop && override == nil
-            ? FigureVariation.random(for: played, exit: style.entrance, using: &generator)
+            ? FigureVariation.random(repeats: info.repeatRange, exit: style.entrance, using: &generator)
             : .standard
         // Travelling actions: as many beats as fit from this spot (the top
         // walks toward the wider side).
         let forward = edge == .top && spot > 0.5 ? -1.0 : 1.0
-        if let beat = FigureTimeline.travel(played, repeats: 1) {
+        if let beat = info.travelPerBeat {
             let fromSpot = rect.map { metrics.travelRoom(at: edge, on: $0, viewport: visible, from: spot) } ?? 0
             // The climb goes all the way up: every cycle that fits.
-            let wanted = played == .climb ? Int.max : variation.repeats ?? FigureTimeline.canvasRepeats(played)
+            let wanted = travelsToTop ? Int.max : variation.repeats ?? info.defaultRepeats
             variation.repeats = max(1, min(wanted, Int((fromSpot + 1e-9) / beat)))
         }
-        timeline = FigureTimeline(
+        timeline = character.play(FigurePlayRequest(
             action: played, entrance: entrance, reduceMotion: reduceMotion, edge: edge,
-            relocating: relocating, from: current.edge, pose: current.edge.isSide ? shownPose : nil,
+            relocating: relocating, previousEdge: current.edge, previousPose: shownPose,
             tempo: style.tempo, variation: variation
-        )
+        ))
         isHidden = false
         isStill = false
         if let distance = timeline.walkDistance {

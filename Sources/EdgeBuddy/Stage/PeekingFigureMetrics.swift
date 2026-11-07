@@ -13,9 +13,12 @@ struct PeekingFigureMetrics: Equatable, Sendable {
     /// Height of the figure's box above the card's edge (pt) — the head with
     /// room for jumps, down to the feet on the edge (`FigureSkeleton.peekBox`).
     let height: CGFloat
+    /// The character's boxes at each edge, in its own units.
+    let geometry: FigureGeometry
 
-    init(height: CGFloat = PeekingFigureMetrics.defaultHeight) {
+    init(height: CGFloat = PeekingFigureMetrics.defaultHeight, geometry: FigureGeometry = .human) {
         self.height = Self.clampedHeight(height)
+        self.geometry = geometry
     }
 
     /// `height` raised to the minimum; a non-finite value falls back to the default.
@@ -23,9 +26,15 @@ struct PeekingFigureMetrics: Equatable, Sendable {
         height.isFinite ? max(height, minimumHeight) : defaultHeight
     }
 
-    /// Width of `FigureSkeleton.peekBox` at `height`.
+    /// Width of the widest box the figure stands on or hangs under (the
+    /// top's `FigureSkeleton.peekBox` for the human) at `height`.
     var width: CGFloat {
-        (height * FigureSkeleton.peekBox.width / FigureSkeleton.peekBox.height).rounded()
+        let edges = geometry.supportedEdges
+        let widths = [
+            edges.contains(.top) ? geometry.top.rect.width : nil,
+            edges.contains(.bottom) ? geometry.bottom.rect.width : nil,
+        ].compactMap { $0 }
+        return (height * (widths.max() ?? geometry.top.rect.width) / geometry.referenceHeight).rounded()
     }
     /// Smallest gap from either card edge to the figure's box (28 pt at the
     /// default height).
@@ -35,7 +44,7 @@ struct PeekingFigureMetrics: Equatable, Sendable {
         FigureAnchorPicker.minimumWidth(figureWidth: width, margin: edgeMargin)
     }
     /// Points per grid unit of the rig.
-    var scale: CGFloat { height / FigureSkeleton.peekBox.height }
+    var scale: CGFloat { height / geometry.referenceHeight }
 
     /// What the hanging figure draws under a bottom edge: from the edge (its
     /// top) down past the feet, the full width.
@@ -47,13 +56,31 @@ struct PeekingFigureMetrics: Equatable, Sendable {
     static let sideBox = CGRect(
         x: FigureEdgePoses.sideMaskX, y: 0, width: 2 * FigureEdgePoses.sideEdgeX - FigureEdgePoses.sideMaskX, height: 112
     )
-    /// How far the side box reaches over the card, past its edge, points.
-    var sideOverlap: CGFloat { (FigureEdgePoses.sideEdgeX - FigureEdgePoses.sideMaskX) * scale }
+    /// How far the side box at `edge` reaches over the card, past its edge, points.
+    func sideOverlap(at edge: FigureEdge) -> CGFloat {
+        let box = geometry.box(edge)
+        return (box.edge - box.rect.minX) * scale
+    }
+    /// How far the box at `edge` reaches past the card's edge into the card
+    /// (top: below the edge, bottom: above it), points — zero for the human.
+    func edgeOverlap(at edge: FigureEdge) -> CGFloat {
+        let box = geometry.box(edge)
+        switch edge {
+        case .top: return (box.rect.maxY - box.edge) * scale
+        case .bottom: return (box.edge - box.rect.minY) * scale
+        case .leading, .trailing: return sideOverlap(at: edge)
+        }
+    }
     /// Smallest gap from a side box to the visible ends of the card's edge
     /// (12 pt at the default height).
     var sideMargin: CGFloat { 12 * height / Self.defaultHeight }
 
-    /// The part of the rig's grid drawn at `edge`.
+    /// The part of the character's space drawn at `edge`.
+    func box(for edge: FigureEdge) -> CGRect {
+        geometry.box(edge).rect
+    }
+
+    /// The part of the human rig's grid drawn at `edge`.
     static func box(for edge: FigureEdge) -> CGRect {
         switch edge {
         case .top: FigureSkeleton.peekBox
@@ -64,18 +91,23 @@ struct PeekingFigureMetrics: Equatable, Sendable {
 
     /// Size of the drawn box at `edge`, points.
     func size(for edge: FigureEdge) -> CGSize {
-        let box = Self.box(for: edge)
+        let box = box(for: edge)
         return CGSize(width: (box.width * scale).rounded(), height: (box.height * scale).rounded())
     }
 
     /// What an anchor needs at each edge.
     var sizes: FigureSizes {
-        let side = size(for: .trailing).height + 2 * sideMargin
+        let side = max(size(for: .trailing).height, size(for: .leading).height) + 2 * sideMargin
+        let top = geometry.top
+        let above = top.edge - top.rect.minY
         return FigureSizes(
-            figureHeight: height, minWidth: minimumAnchorWidth,
-            hangHeight: size(for: .bottom).height,
+            figureHeight: above == geometry.referenceHeight ? height : above * scale,
+            minWidth: minimumAnchorWidth,
+            hangHeight: size(for: .bottom).height - edgeOverlap(at: .bottom),
             sideMinHeight: side,
-            climbMinHeight: (side + (FigureTimeline.minimumTravel(.climb) ?? 0) * scale).rounded(.up),
+            // A side at the screen's edge plays only what fits there (the
+            // human only climbs): its shortest travel on top of the box.
+            climbMinHeight: (side + (geometry.screenEdgeSideRoom ?? .infinity) * scale).rounded(.up),
             screenEdgeGap: screenEdgeGap
         )
     }
