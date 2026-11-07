@@ -62,6 +62,22 @@ Decisions:
 - [x] Executed (inside a page; above NavigationStack/TabView parked)
 - [x] Committed
 
+### Phase 5 — Characters with their own skeleton and animations (2026-11-07)
+- Context: `FigureCharacter` (Phase 4 step 2) only draws the human skeleton; motion and edge contact are hard-coded for a human in `FigureRig.swift`. A ghost has no arms/legs, so jumping jacks etc. make no sense.
+- **Goal:** the library ships `HumanFigure` (skeleton + IK + animations); a user adds a character by writing a type that conforms to the protocol and brings its own pose model, actions, geometry and drawing.
+- **Decisions:**
+  - Protocol grows into a full description: own `Pose: Sendable` with `interpolated(to:)` (type-erased wrapper in the stage/environment), actions per edge (duration, `pose(at:)`, room needed, travels along the edge or not; empty list = edge unsupported), `rest`/`hidden` poses (generic entrance = rise from hidden to rest, overridable), draw boxes per edge + contact point, `draw(pose:)`.
+  - `HumanFigure` = current rig behind the protocol, behaviour unchanged (95 tests are the safety net). `FigureTimeline`/`FigureEdgePoses` become its internals.
+  - `FigureAppearance` moves into `HumanFigure` as parameters (`.figureCharacter(HumanFigure(head: …, limbScale: …))`); `FigureAppearance.character` goes away (pre-1.0, API may break in a minor).
+  - Pins refer to a character's action by name/id; `FigurePose` stays as the convenient alias for `HumanFigure`. `RunningFigure` stays human-only.
+  - Execution order: (1) extract protocol, move human behind it, no behaviour change; (2) public API + a ghost with its own skeleton/actions in the demo; (3) appearance → `HumanFigure` params; docs, changelog.
+- Risks: freezes the animation model as public API (ship as 0.x, say so); per-frame cost of `pose(at:)` + `draw` (measure with signposts); hit testing/layout follow the character's boxes.
+- [x] Discussed
+- [ ] Researched
+- [ ] Planned
+- [ ] Executed
+- [ ] Committed
+
 ---
 
 ## Deferred (parking lot)
