@@ -25,6 +25,7 @@ public struct RunningFigure: View {
     private let phase: Double
     private let color: Color
     private let viewBox: CGRect
+    private let appearance: FigureAppearance
 
     /// One frame of the run.
     ///
@@ -34,13 +35,18 @@ public struct RunningFigure: View {
     ///   - color: the figure's colour.
     ///   - viewBox: the part of the rig's grid to show, scaled to the view's
     ///     height. Defaults to `bodyBox`; its aspect ratio is the view's.
-    public init(phase: Double, color: Color, viewBox: CGRect = RunningFigure.bodyBox) {
+    ///   - appearance: the figure's look; the default round head and one colour.
+    public init(
+        phase: Double, color: Color, viewBox: CGRect = RunningFigure.bodyBox,
+        appearance: FigureAppearance = .standard
+    ) {
+        self.appearance = appearance
         self.phase = phase
         self.color = color
         self.viewBox = viewBox
     }
 
     public var body: some View {
-        FigureCanvas(joints: .run(phase: phase), color: color, viewBox: viewBox)
+        FigureCanvas(joints: .run(phase: phase), color: color, appearance: appearance, viewBox: viewBox)
     }
 }

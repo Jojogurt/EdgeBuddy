@@ -31,6 +31,7 @@ struct PeekingFigureView: View {
     var pin: FigurePin?
     var onTap: () -> Void = {}
 
+    @Environment(\.figureAppearance) private var appearance
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Hidden behind the card until the first play starts.
@@ -85,7 +86,7 @@ struct PeekingFigureView: View {
                 let visible = viewport(for: place.anchor)
                 let pose = joints(at: elapsed, edge: place.edge)
                 let frame = figureFrame(at: place.edge, spot: place.spot, on: rect)
-                FigureCanvas(joints: pose, color: color, viewBox: PeekingFigureMetrics.box(for: place.edge))
+                FigureCanvas(joints: pose, color: color, appearance: appearance, viewBox: PeekingFigureMetrics.box(for: place.edge))
                     .opacity(timeline.opacity(at: elapsed))
                     .frame(width: frame.width, height: frame.height)
                     // Whatever is behind the card (past the box) never shows.

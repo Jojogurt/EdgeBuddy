@@ -67,6 +67,7 @@ Decisions:
 - Step 2: public renderer — closure gets the skeleton points (hip, torsoTop, head, arms, legs, far-limb opacity), `GraphicsContext` and size/viewBox. Name clash: `FigurePose` is already the pinned-pose enum — pick another name (e.g. `FigureSkeletonPoints`).
 - The stage keeps clipping, hit testing and mirroring; custom drawing must fit the viewBox.
 - Sprite sheets rejected: poses are continuous (IK), frames would lose smoothness.
+- **Step 1 done (2026-11-07):** `FigureAppearance` (+ `FigureHead`: circle/symbol/text/image, head/limb/torso scale clamped 0.6…1.5, per-part colours, `mirrorsHead`), `figureAppearance(_:)`, `RunningFigure(appearance:)`; `FigureCanvas` draws the head via Canvas symbols, tilted with lean+tilt. Layout/hit testing unchanged (scales clamp so footprint holds). Tests: `FigureAppearanceTests`; verified bear emoji head in the Simulator. Step 2 (public renderer) not started.
 - [x] Discussed
 - [ ] Researched
 - [ ] Planned

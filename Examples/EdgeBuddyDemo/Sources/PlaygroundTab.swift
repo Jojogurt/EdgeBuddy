@@ -16,6 +16,19 @@ struct PlaygroundTab: View {
         }
     }
 
+    private enum Head: String, CaseIterable {
+        case circle = "Circle", bear = "🐻", star = "Star"
+
+        var figureHead: FigureHead {
+            switch self {
+            case .circle: .circle
+            case .bear: .text("🐻")
+            case .star: .symbol("star.fill")
+            }
+        }
+    }
+
+    @State private var head = Head.circle
     @State private var color = Color.green
     @State private var height: CGFloat = 56
     @State private var opacity = 1.0
@@ -56,6 +69,7 @@ struct PlaygroundTab: View {
                 loops: loops
             )
             .figureColor(color)
+            .figureAppearance(FigureAppearance(head: head.figureHead, headScale: head == .circle ? 1 : 1.5))
             .figureOpacity(opacity)
             .figureHeight(height)
             .figureHaptics(haptics)
@@ -70,6 +84,9 @@ struct PlaygroundTab: View {
             LabeledContent("Opacity") { Slider(value: $opacity, in: 0.2...1) }
             LabeledContent("Tempo \(tempo.formatted(.number.precision(.fractionLength(1))))×") {
                 Slider(value: $tempo, in: 0.5...2)
+            }
+            Picker("Head", selection: $head) {
+                ForEach(Head.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
             Picker("Entrance", selection: $entrance) {
                 Text("Climb").tag(FigureEntrance.climb)
