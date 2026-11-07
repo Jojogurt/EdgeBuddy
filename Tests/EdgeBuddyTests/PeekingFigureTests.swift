@@ -271,7 +271,9 @@ struct PeekingFigureTests {
     func exitMirrorsEntrance(entrance: FigureEntrance) {
         let enter = FigureTimeline.entranceSteps(entrance)
         let exit = FigureTimeline.exitSteps(entrance)
-        #expect(abs(enter.map(\.duration).reduce(0, +) - exit.map(\.duration).reduce(0, +)) < 1e-9)
+        let enterDuration: Double = enter.map(\.duration).reduce(0, +)
+        let exitDuration: Double = exit.map(\.duration).reduce(0, +)
+        #expect(abs(enterDuration - exitDuration) < 1e-9)
         #expect(exit.last?.joints == FigureTimeline.hiddenPose(entrance))
         #expect(Array(exit.dropLast().map(\.joints)) == Array(enter.dropLast().map(\.joints).reversed()))
     }
