@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## 0.3.1 — 2026-11-07
+
+- Fix (regression in 0.3.0): an anchor inside a horizontal pager (`ScrollView(.horizontal)`
+  with `.scrollTargetBehavior(.paging)`) nested in the screen's vertical `ScrollView` took the
+  pager as its visible area. The figure was cut off just above the card and beside it, and while
+  it climbed a side and the screen scrolled up, it slid along the navigation bar's bottom edge
+  instead of staying on the card going under the bar. An anchor's visible area now takes Y from
+  the closest vertical scroll view and X from the closest horizontal one (the pager still cuts off
+  the cards of other pages), so it no longer changes while the screen scrolls.
+- A side spot is clamped to a changed viewport once the scroll stops, not on every scroll frame.
+- Demo: the Playground tab has cards in a horizontal pager inside its vertical `ScrollView`.
+
 ## 0.3.0 — 2026-11-07
 
 - Fix: right after launch the figure could come out once and stand still forever — when looping became

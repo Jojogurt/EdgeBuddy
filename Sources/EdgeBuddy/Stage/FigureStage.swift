@@ -121,11 +121,16 @@ private struct FigureAnchorModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // The scroll view's frame between its bars, in global space: it
-            // does not move while scrolling, so this fires only on layout.
+            // The visible area of the scroll views around it, in global space:
+            // Y from the closest vertical one, X from the closest horizontal one
+            // (a pager inside the screen's scroll view). Neither moves while its
+            // own content scrolls, so this fires only on layout.
             .onGeometryChange(for: CGRect?.self) { proxy in
-                let origin = proxy.frame(in: .global).origin
-                return proxy.bounds(of: .scrollView).map { $0.offsetBy(dx: origin.x, dy: origin.y) }
+                FigureViewport.region(
+                    vertical: proxy.bounds(of: .scrollView(axis: .vertical)),
+                    horizontal: proxy.bounds(of: .scrollView(axis: .horizontal)),
+                    origin: proxy.frame(in: .global).origin
+                )
             } action: { region = $0 }
             .anchorPreference(key: FigureAnchorsKey.self, value: .bounds) {
                 [FigureAnchorItem(id: id, edges: edges, bounds: $0, region: region)]
@@ -159,6 +164,29 @@ struct FigureScrollTracker: Equatable {
 }
 
 enum FigureViewport {
+    /// The visible area around an anchor, in global space, from the bounds of
+    /// the closest vertical and horizontal scroll views (each in the anchor's
+    /// local space; `origin` = the anchor's global origin). Y comes from the
+    /// vertical one — not from a horizontal pager nested in it, which moves
+    /// with the vertical scroll and is only about as tall as its cards — and X
+    /// from both (the pager cuts off the cards of other pages). One alone is
+    /// used as it is; none = nil (not in a scroll view).
+    static func region(vertical: CGRect?, horizontal: CGRect?, origin: CGPoint) -> CGRect? {
+        let global = { (rect: CGRect) in rect.offsetBy(dx: origin.x, dy: origin.y) }
+        switch (vertical.map(global), horizontal.map(global)) {
+        case (nil, nil):
+            return nil
+        case let (vertical?, nil):
+            return vertical
+        case let (nil, horizontal?):
+            return horizontal
+        case let (vertical?, horizontal?):
+            let minX = max(vertical.minX, horizontal.minX)
+            let maxX = min(vertical.maxX, horizontal.maxX)
+            return CGRect(x: minX, y: vertical.minY, width: max(0, maxX - minX), height: vertical.height)
+        }
+    }
+
     /// The stage's visible area for an anchor: the scroll view's `region`
     /// (global space; `origin` = the stage's global origin) inside the stage.
     /// nil region = the whole stage. A region outside the stage is empty.

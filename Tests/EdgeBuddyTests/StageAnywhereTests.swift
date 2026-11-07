@@ -65,6 +65,57 @@ struct StageAnywhereTests {
         #expect(FigurePinnedPlay.resolve(pin, anchors: [bounded], viewport: stage, metrics: metrics, style: .standard) == nil)
     }
 
+    @Test("Not in a scroll view: no region; one scroll view alone is used as it is")
+    func regionSingleScrollView() {
+        let origin = CGPoint(x: 16, y: 300)
+        #expect(FigureViewport.region(vertical: nil, horizontal: nil, origin: origin) == nil)
+        let local = CGRect(x: -16, y: -200, width: 390, height: 600)
+        let global = CGRect(x: 0, y: 100, width: 390, height: 600)
+        #expect(FigureViewport.region(vertical: local, horizontal: nil, origin: origin) == global)
+        #expect(FigureViewport.region(vertical: nil, horizontal: local, origin: origin) == global)
+    }
+
+    /// The screen's vertical scroll view between its bars (global space), and a
+    /// horizontal pager in it, about as tall as its card, scrolled up by `offset`.
+    private func nestedPager(offset: CGFloat) -> (vertical: CGRect, horizontal: CGRect, origin: CGPoint) {
+        let screen = CGRect(x: 0, y: 153, width: 390, height: 608)
+        let pager = CGRect(x: 0, y: 400 - offset, width: 390, height: 180)
+        // The card on the pager's current page, 16 pt in, 10 pt down.
+        let card = CGPoint(x: 16, y: pager.minY + 10)
+        let local = { (rect: CGRect) in rect.offsetBy(dx: -card.x, dy: -card.y) }
+        return (local(screen), local(pager), card)
+    }
+
+    @Test("A card in a pager in a vertical scroll view: Y from the vertical one, X from the pager")
+    func regionNestedPager() {
+        let nested = nestedPager(offset: 0)
+        let region = FigureViewport.region(vertical: nested.vertical, horizontal: nested.horizontal, origin: nested.origin)
+        // Not the pager's frame (y 400, height 180) — the figure has room above and below the card.
+        #expect(region == CGRect(x: 0, y: 153, width: 390, height: 608))
+    }
+
+    @Test("The pager's X narrows the region (cards of other pages are cut off)")
+    func regionPagerNarrowsX() {
+        let origin = CGPoint(x: 40, y: 300)
+        let vertical = CGRect(x: -40, y: -147, width: 390, height: 608)   // global x 0…390
+        let horizontal = CGRect(x: -20, y: -10, width: 300, height: 180)  // global x 20…320
+        let region = FigureViewport.region(vertical: vertical, horizontal: horizontal, origin: origin)
+        #expect(region == CGRect(x: 20, y: 153, width: 300, height: 608))
+    }
+
+    @Test("Regression 0.3.0: the region does not move while the screen scrolls vertically")
+    func regionStableWhileScrolling() {
+        let regions = stride(from: CGFloat(0), through: 400, by: 25).map { offset in
+            let nested = nestedPager(offset: offset)
+            return FigureViewport.region(vertical: nested.vertical, horizontal: nested.horizontal, origin: nested.origin)
+        }
+        #expect(Set(regions.map { $0.map { [$0.minX, $0.minY, $0.width, $0.height] } }).count == 1)
+        // The anchor's viewport in a stage under the navigation bar stays put too.
+        let origin = CGPoint(x: 0, y: 47)
+        let viewports = regions.map { FigureViewport.resolve(stage: stage, region: $0, origin: origin) }
+        #expect(viewports.allSatisfy { $0 == CGRect(x: 0, y: 106, width: 390, height: 608) })
+    }
+
     @Test("Scroll tracker counts several scroll views; never goes negative")
     func tracker() {
         var tracker = FigureScrollTracker()

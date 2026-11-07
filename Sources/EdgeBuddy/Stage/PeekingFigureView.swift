@@ -48,6 +48,9 @@ struct PeekingFigureView: View {
     /// Hidden with nowhere to come out right now (a scroll in progress or no
     /// anchor fully on screen) — a scroll stop or new anchors resume it.
     @State private var isParked = false
+    /// The viewport changed mid-scroll (say a large title collapsing): the
+    /// side spot is clamped once the scroll stops, not on every frame.
+    @State private var needsReclamp = false
     /// The pose holds still — the animation clock stops (`stillWindows`).
     @State private var isStill = false
     /// Waiting out `FigureStyle.appearDelay` before the first entrance.
@@ -115,6 +118,7 @@ struct PeekingFigureView: View {
             isPending = false
             isHidden = true
             isParked = false
+            needsReclamp = false
             isStill = false
             isDelayingEntrance = false
             anchorID = nil
@@ -150,7 +154,12 @@ struct PeekingFigureView: View {
             }
         }
         .onChange(of: isScrolling) { _, scrolling in
-            if !scrolling, isParked, !isWaiting { comeOut() }
+            guard !scrolling else { return }
+            if needsReclamp {
+                needsReclamp = false
+                reclampSpot()
+            }
+            if isParked, !isWaiting { comeOut() }
         }
         // A hash, not an array: this expression runs on every scroll frame.
         .onChange(of: anchorSignature) {
@@ -177,7 +186,9 @@ struct PeekingFigureView: View {
         }
         .onChange(of: viewportSignature) {
             // Laid out for real (the first pass can be empty), or resized.
-            reclampSpot()
+            // Mid-scroll the figure rides along with its card; it is clamped
+            // once the scroll stops.
+            if isScrolling { needsReclamp = true } else { reclampSpot() }
             if !isPinned, pin != nil, showPin() { return }
             if isParked, !isWaiting, !isPinned { comeOut() }
         }

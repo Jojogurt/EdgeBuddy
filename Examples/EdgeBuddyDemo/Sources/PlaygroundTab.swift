@@ -58,6 +58,8 @@ struct PlaygroundTab: View {
                     Card(title: "This week", height: 140)
                         .figureAnchor("week", edges: [.top, .bottom])
 
+                    pager
+
                     settings
 
                     ForEach(1...5, id: \.self) { index in
@@ -82,6 +84,28 @@ struct PlaygroundTab: View {
             .figureHaptics(haptics)
             .navigationTitle("Playground")
         }
+    }
+
+    /// Cards in a horizontal pager inside the screen's vertical `ScrollView`:
+    /// the figure still stands above them and climbs their sides (the pager
+    /// only cuts off the other pages), and stays on its card while the screen
+    /// scrolls under the navigation bar.
+    private var pager: some View {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                ForEach(1...3, id: \.self) { page in
+                    Card(title: "Page \(page) of 3", height: 160)
+                        .figureAnchor("page-\(page)", edges: .all)
+                        .padding(.horizontal, 48)
+                        .containerRelativeFrame(.horizontal)
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollIndicators(.hidden)
+        // Full width: room for the figure beside each card.
+        .padding(.horizontal, -16)
     }
 
     private var settings: some View {
