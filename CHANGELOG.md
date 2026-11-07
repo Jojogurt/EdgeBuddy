@@ -25,7 +25,13 @@ change in minor releases.
   Scroll phases of all of them are counted, not a single flag. The stage must
   sit inside a `NavigationStack` page / tab, not above it (SwiftUI does not
   pass preferences out of those containers).
-- CI: tests also run on the iOS Simulator; Xcode pinned to 16.4.
+- CI: tests also run on the iOS Simulator; Xcode pinned to 16.4; the demo app is built for iOS Simulator and macOS.
+- Demo: `Examples/EdgeBuddyDemo` is a committed multiplatform `.xcodeproj` with four tabs
+  (Playground, Pinning, Static, Single card); a GIF in the README.
+- `FigureAppearance` / `figureAppearance(_:)`: head as a symbol, text/emoji or image, head / limb /
+  torso scale, a colour per part; `RunningFigure(appearance:)`.
+- `FigureCharacter` protocol + `FigureSkeletonPoints` + `Stickman`: draw a completely different
+  figure from the skeleton points (`FigureAppearance(character:)`).
 
 ## 0.2.0 — 2026-11-07
 
