@@ -19,10 +19,24 @@ jobs:
         run: xcodebuild -version
       - name: Test (macOS)
         run: swift test
+      # The runner's simulator list can come up empty for a moment (CoreSimulator
+      # still starting), so a hard-coded device name fails at random: wait for any
+      # available iPhone and test on it by id.
+      - name: Pick an iPhone simulator
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            id=$(xcrun simctl list devices available -j \
+              | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[]
+                        | select(.name | startswith("iPhone"))][0].udid // empty')
+            if [ -n "$id" ]; then echo "SIMULATOR_ID=$id" >> "$GITHUB_ENV"; echo "Using $id"; exit 0; fi
+            echo "No iPhone simulator yet (attempt $attempt), waiting…"; sleep 10
+          done
+          xcrun simctl list devices available
+          echo "::error::No available iPhone simulator for $(xcodebuild -version | head -1)"; exit 1
       - name: Test (iOS Simulator)
         run: |
           xcodebuild test -scheme EdgeBuddy \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -quiet
       - name: Build demo (iOS Simulator)
         run: |
