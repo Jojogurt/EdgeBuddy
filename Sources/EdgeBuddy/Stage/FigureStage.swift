@@ -124,7 +124,8 @@ private struct FigureAnchorModifier: ViewModifier {
             // The visible area of the scroll views around it, in global space:
             // Y from the closest vertical one, X from the closest horizontal one
             // (a pager inside the screen's scroll view). Neither moves while its
-            // own content scrolls, so this fires only on layout.
+            // own content scrolls (rounded: the measure jitters by ~1e-14 from
+            // frame to frame), so this fires on layout and when a bar resizes.
             .onGeometryChange(for: CGRect?.self) { proxy in
                 FigureViewport.region(
                     vertical: proxy.bounds(of: .scrollView(axis: .vertical)),
@@ -172,7 +173,9 @@ enum FigureViewport {
     /// from both (the pager cuts off the cards of other pages). One alone is
     /// used as it is; none = nil (not in a scroll view).
     static func region(vertical: CGRect?, horizontal: CGRect?, origin: CGPoint) -> CGRect? {
-        let global = { (rect: CGRect) in rect.offsetBy(dx: origin.x, dy: origin.y) }
+        // Rounded to 1/100 pt: the anchor's origin and the scroll view's bounds
+        // carry floating-point noise that changes on every scroll frame.
+        let global = { (rect: CGRect) in rounded(rect.offsetBy(dx: origin.x, dy: origin.y)) }
         switch (vertical.map(global), horizontal.map(global)) {
         case (nil, nil):
             return nil
@@ -185,6 +188,11 @@ enum FigureViewport {
             let maxX = min(vertical.maxX, horizontal.maxX)
             return CGRect(x: minX, y: vertical.minY, width: max(0, maxX - minX), height: vertical.height)
         }
+    }
+
+    private static func rounded(_ rect: CGRect) -> CGRect {
+        let round = { (value: CGFloat) in (value * 100).rounded() / 100 }
+        return CGRect(x: round(rect.minX), y: round(rect.minY), width: round(rect.width), height: round(rect.height))
     }
 
     /// The stage's visible area for an anchor: the scroll view's `region`

@@ -116,6 +116,21 @@ struct StageAnywhereTests {
         #expect(viewports.allSatisfy { $0 == CGRect(x: 0, y: 106, width: 390, height: 608) })
     }
 
+    @Test("Floating-point noise in the measure does not change the region (no per-frame updates)")
+    func regionIgnoresNoise() {
+        // Seen on iOS while scrolling: the top flips between 153.0 and 152.99999999999997.
+        let origin = CGPoint(x: 64, y: 410.33333333333337)
+        let exact = FigureViewport.region(
+            vertical: CGRect(x: -64, y: 153 - origin.y, width: 390, height: 608), horizontal: nil, origin: origin
+        )
+        let noisy = FigureViewport.region(
+            vertical: CGRect(x: -64, y: 152.99999999999997 - origin.y, width: 390, height: 608.0000000000001),
+            horizontal: nil, origin: origin
+        )
+        #expect(exact == noisy)
+        #expect(exact == CGRect(x: 0, y: 153, width: 390, height: 608))
+    }
+
     @Test("Scroll tracker counts several scroll views; never goes negative")
     func tracker() {
         var tracker = FigureScrollTracker()

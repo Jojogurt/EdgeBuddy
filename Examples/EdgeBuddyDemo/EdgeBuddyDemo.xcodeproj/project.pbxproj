@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1BA5717E73893E7B9944414C /* PagerTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88695EA8E14596E9E5CEF329 /* PagerTab.swift */; };
 		2959B4B5B8E8C3771993712E /* EdgeBuddyDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D2CC25CE7878A9F9777040 /* EdgeBuddyDemoApp.swift */; };
 		90F6FC1F3BDF8D7C708F6ACA /* SingleCardTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 203772441583BE6AF9F0B7E5 /* SingleCardTab.swift */; };
 		9448C7FE4D1F01C6598BA9C3 /* EdgeBuddy in Frameworks */ = {isa = PBXBuildFile; productRef = D58DC697228F712CE1831A3C /* EdgeBuddy */; };
@@ -25,6 +26,7 @@
 		70049A0281216441D4AAC610 /* EdgeBuddy */ = {isa = PBXFileReference; lastKnownFileType = folder; name = EdgeBuddy; path = ../..; sourceTree = SOURCE_ROOT; };
 		74548C88BCB1D3167795163A /* PinningTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinningTab.swift; sourceTree = "<group>"; };
 		82478EE9E77219536040077D /* EdgeBuddyDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = EdgeBuddyDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		88695EA8E14596E9E5CEF329 /* PagerTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PagerTab.swift; sourceTree = "<group>"; };
 		9C525CFE7909757D8BFFEA07 /* StaticTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaticTab.swift; sourceTree = "<group>"; };
 		E6EB5B01B5B08CE0D103873D /* Ghost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghost.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -55,6 +57,7 @@
 				4870BF9A2AFBB45E5000CB00 /* Card.swift */,
 				19D2CC25CE7878A9F9777040 /* EdgeBuddyDemoApp.swift */,
 				E6EB5B01B5B08CE0D103873D /* Ghost.swift */,
+				88695EA8E14596E9E5CEF329 /* PagerTab.swift */,
 				74548C88BCB1D3167795163A /* PinningTab.swift */,
 				48EF0238545C717664FC2BB1 /* PlaygroundTab.swift */,
 				203772441583BE6AF9F0B7E5 /* SingleCardTab.swift */,
@@ -146,6 +149,7 @@
 				C9BF74C19058B4782CAE9AF3 /* Card.swift in Sources */,
 				2959B4B5B8E8C3771993712E /* EdgeBuddyDemoApp.swift in Sources */,
 				F3C97DA881257B6127A6C705 /* Ghost.swift in Sources */,
+				1BA5717E73893E7B9944414C /* PagerTab.swift in Sources */,
 				E7A890B8B3C7A7A4B4E3994A /* PinningTab.swift in Sources */,
 				BC76348D99C513C1D1A7DDA9 /* PlaygroundTab.swift in Sources */,
 				90F6FC1F3BDF8D7C708F6ACA /* SingleCardTab.swift in Sources */,

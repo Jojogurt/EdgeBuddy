@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## 0.3.2 — 2026-11-08
+
+- Fix: a figure on a card's side could jump when the screen scrolled. The large title
+  collapsing (or snapping back) changes the visible area mid-scroll; 0.3.1 then clamped the
+  figure to the part of the card still visible once the scroll stopped, moving a running climb
+  off its path. Viewport changes caused by a scroll no longer move the figure — it stays on its
+  card as the card goes under the bar, like with any scroll; only layout changes clamp it.
+- The visible area is rounded to 1/100 pt: its measure jittered by ~1e-14 on every scroll
+  frame, which counted as a change each frame.
+- Demo: a Pager tab — cards in a horizontal pager inside a vertical `ScrollView` under a large
+  title, with "Sides only" (`-EdgeBuddyPagerSides YES`) so the figure climbs often.
+
 ## 0.3.1 — 2026-11-07
 
 - Fix (regression in 0.3.0): an anchor inside a horizontal pager (`ScrollView(.horizontal)`
