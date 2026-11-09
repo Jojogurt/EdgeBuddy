@@ -18,8 +18,7 @@ somewhere else:
 - **bottom edge** — hangs under it (wide grip): swings like a pendulum, pulls
   itself up;
 - **leading / trailing edge** — slides out from behind the card and plays
-  beside it, outside its edge, holding on: hangs out and looks around, does a
-  human flag (hands wide apart on the edge, body held out flat), climbs up the
+  beside it, outside its edge, holding on: does a human flag (hands wide apart on the edge, body held out flat), climbs up the
   edge hand over hand (the flag and the climb come out hands first, straight
   into the action) (only where enough of the side is on screen). Nothing
   plays over the card. A side less than ~28 pt from the screen's edge (a
@@ -286,7 +285,7 @@ once, without the entrance — the steadiest choice for snapshots — and `spot`
 
 `FigurePose` lists the poses with a clear still frame: `.rest` (every edge),
 `.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand` (top),
-`.swing`, `.pullUp` (bottom), `.peek`, `.flag` (sides). A pose pinned at an
+`.swing`, `.pullUp` (bottom), `.flag` (sides). A pose pinned at an
 edge it isn't played at rests there. If the anchor is not on screen or the
 figure doesn't fit at that edge, the stage plays as without a pin and takes
 the pin up as soon as it fits. `figurePinned(nil)` lets it play freely again.

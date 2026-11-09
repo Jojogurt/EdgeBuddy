@@ -22,8 +22,6 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     case swing
     /// Bottom: pulled up, the head at the edge.
     case pullUp
-    /// Sides: hanging out beside the card, a hand on its edge.
-    case peek
     /// Sides: a human flag — the body held out flat beside the card.
     case flag
 
@@ -33,7 +31,7 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
         case .rest: .all
         case .wave, .jumpingJacks, .sideStretch, .march, .handstand: .top
         case .swing, .pullUp: .bottom
-        case .peek, .flag: [.leading, .trailing]
+        case .flag: [.leading, .trailing]
         }
     }
 
@@ -58,7 +56,6 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
         case .handstand: .handstand
         case .swing: .swing
         case .pullUp: .pullUp
-        case .peek: .peek
         case .flag: .flag
         }
     }

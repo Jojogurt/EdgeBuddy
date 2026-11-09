@@ -26,9 +26,6 @@ enum FigureAction: CaseIterable, Equatable, Sendable {
     case swing
     /// Bottom edge: pulls itself up until the head reaches the edge.
     case pullUp
-    /// Side edge: beside the card, a hand on its edge, hangs further out and
-    /// looks around.
-    case peek
     /// Side edge: a human flag — hands wide apart on the edge, the body held
     /// out flat beside the card.
     case flag
@@ -102,7 +99,7 @@ struct FigureVariation: Equatable, Sendable {
         case .handstand: 1...3
         case .run: 3...5
         case .swing, .flag, .climb: 2...4
-        case .pullUp, .peek: 1...3
+        case .pullUp: 1...3
         }
     }
 
@@ -460,9 +457,6 @@ enum FigureEdgePoses {
     }.placing(armL: peekGrip)
     /// The side's nod.
     static let peekTilt = peek.with { $0.tilt = 6 }
-    /// Hanging out from the edge on a longer arm, looking away from the card.
-    static let peekOut = peek.with { $0.lean = 16; $0.x = 70; $0.tilt = 4 }.placing(armL: peekGrip)
-    static let peekLook = peekOut.with { $0.tilt = -6 }
     /// Fully behind the card, left of its side edge (and of `sideMaskX`).
     static let sideHidden = peek.with { $0.x = 14 }
 
@@ -930,16 +924,6 @@ struct FigureTimeline: Equatable, Sendable {
                 at(0.14, poses.pullTop, limbs: poses.hangGrips)
                 at(0.42, rest, limbs: poses.hangGrips)
             }
-        case .peek:
-            for round in 0..<repeats {
-                at(0.35, poses.peekOut, limbs: Self.peekGrip)
-                if round == 0 { signature = time }
-                at(0.3, poses.peekLook, limbs: Self.peekGrip)
-                at(0.25, poses.peekOut, limbs: Self.peekGrip)
-                at(0.35, rest, limbs: Self.peekGrip)
-            }
-            at(0.24, poses.peekTilt, limbs: Self.peekGrip)
-            at(0.3, rest, limbs: Self.peekGrip)
         case .flag:
             if !entersOwnWay {
                 // From the peek: the near hand slides down the edge to its
@@ -1114,7 +1098,7 @@ struct FigureTimeline: Equatable, Sendable {
     static func canvasRepeats(_ action: FigureAction) -> Int {
         switch action {
         case .rest, .sideStretch: 1
-        case .swing, .pullUp, .peek, .handstand: 2
+        case .swing, .pullUp, .handstand: 2
         case .wave, .jumpingJacks, .march, .flag, .climb, .wormWalk: 3
         case .run: runCycles
         }
@@ -1498,7 +1482,7 @@ enum FigureRepertoire {
     static let top: [FigureAction] = [.wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run]
     /// Actions hanging under the bottom edge.
     static let bottom: [FigureAction] = [.swing, .pullUp]
-    /// Actions at a side edge (the peek stays out: it only leans in place).
+    /// Actions at a side edge.
     static let side: [FigureAction] = [.flag, .climb]
 
     /// The repertoire of `edge`.
@@ -1555,7 +1539,7 @@ struct FigureSizes: Equatable, Sendable {
     var sideMinHeight: CGFloat
     /// Smallest on-screen height of a side for the climb: `sideMinHeight`
     /// plus its shortest climb (`FigureTimeline.minimumTravel(.climb)`).
-    /// Shorter sides still take the peek and the flag.
+    /// Shorter sides still take the flag.
     var climbMinHeight: CGFloat = 0
     /// A side closer than this to the viewport's edge is at the screen's
     /// edge: no room beside the card, so it only climbs there

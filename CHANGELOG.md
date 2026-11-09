@@ -13,6 +13,12 @@ change in minor releases.
   top). A scroll ends the run once the action playing finishes, then it goes back behind the
   card; a tap starts a new run elsewhere. Only while it loops. Demo: Playground's "Actions per
   appearance".
+- Removed: the peek action and `FigurePose.peek` (hanging further out and looking around at a
+  side; never drawn at random, only pinned). Sides play the flag and the climb; the side's rest
+  pose stays.
+- Fix: in a run (`FigureStyle.actionsPerCycle`) a climb to the top of a side where nothing else
+  fits from there (by the screen's edge it only climbs) ends the run — it leaves its own way
+  instead of standing to lean out and go back.
 
 ## 0.3.3 — 2026-11-09
 

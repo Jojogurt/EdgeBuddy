@@ -17,10 +17,10 @@ public struct FigureEdges: OptionSet, Hashable, Sendable {
     public static let top = FigureEdges(rawValue: 1 << 0)
     /// Hangs under the bottom edge: swings, pulls itself up.
     public static let bottom = FigureEdges(rawValue: 1 << 1)
-    /// Peeks, flags or climbs at the leading edge (the left in left-to-right
+    /// Flags or climbs at the leading edge (the left in left-to-right
     /// layouts, the right in right-to-left ones).
     public static let leading = FigureEdges(rawValue: 1 << 2)
-    /// Peeks, flags or climbs at the trailing edge.
+    /// Flags or climbs at the trailing edge.
     public static let trailing = FigureEdges(rawValue: 1 << 3)
     /// All four edges.
     public static let all: FigureEdges = [.top, .bottom, .leading, .trailing]

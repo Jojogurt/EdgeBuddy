@@ -438,7 +438,7 @@ struct PeekingFigureTests {
 
     private static let edgeActions: [(FigureAction, FigureEdge)] = [
         (.rest, .bottom), (.swing, .bottom), (.pullUp, .bottom),
-        (.rest, .trailing), (.peek, .trailing), (.flag, .trailing), (.climb, .trailing), (.peek, .leading),
+        (.rest, .trailing), (.flag, .trailing), (.climb, .trailing), (.rest, .leading),
     ]
 
     private func points(_ joints: FigureJoints) -> [CGPoint] {
@@ -523,7 +523,7 @@ struct PeekingFigureTests {
     func climbTravels() {
         let climb = FigureTimeline(action: .climb, entrance: nil, reduceMotion: false, edge: .trailing)
         #expect(climb.walkWindow != nil)
-        for action in [FigureAction.swing, .pullUp, .peek, .flag] {
+        for action in [FigureAction.swing, .pullUp, .flag] {
             let edge: FigureEdge = action == .swing || action == .pullUp ? .bottom : .trailing
             #expect(FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: edge).walkWindow == nil)
         }
@@ -767,9 +767,9 @@ struct PeekingFigureTests {
         #expect(top.armL[1].x < top.armL[0].x && top.armR[1].x > top.armR[0].x)
     }
 
-    @Test("Side: held hands stay put through the peek and the flag")
+    @Test("Side: held hands stay put through the rest and the flag")
     func sideGripsSampled() {
-        for action in [FigureAction.rest, .peek, .flag] {
+        for action in [FigureAction.rest, .flag] {
             let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: .trailing)
             for time in samples(timeline) {
                 guard let (a, b) = segment(timeline, at: time), !b.limbs.isEmpty else { continue }
@@ -821,7 +821,7 @@ struct PeekingFigureTests {
     }
 
     @Test("Side actions play outside the card: torso and head beside it, only the grips over the edge",
-          arguments: [FigureAction.rest, .peek, .flag, .climb])
+          arguments: [FigureAction.rest, .flag, .climb])
     func sideOutside(action: FigureAction) {
         let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: .trailing)
         for time in samples(timeline) {
@@ -843,7 +843,7 @@ struct PeekingFigureTests {
         var variation = FigureVariation.standard
         variation.exit = .spring
         let timeline = FigureTimeline(
-            action: .peek, entrance: .spring, reduceMotion: false, edge: .trailing, variation: variation
+            action: .rest, entrance: .spring, reduceMotion: false, edge: .trailing, variation: variation
         )
         #expect(extent(timeline.keyframes[0].joints).maxX < FigureEdgePoses.sideMaskX)
         #expect(extent(timeline.final).maxX < FigureEdgePoses.sideMaskX)
@@ -1088,7 +1088,7 @@ struct PeekingFigureTests {
 
     @Test("Flipped facing draws the same figure")
     func flippedFacing() {
-        for pose in [FigureEdgePoses.peek, FigureEdgePoses.peekOut, FigureJoints.rest] {
+        for pose in [FigureEdgePoses.peek, FigureEdgePoses.peekTilt, FigureJoints.rest] {
             let a = FigureSkeleton(pose), b = FigureSkeleton(pose.flippedFacing)
             #expect(distance(a.head, b.head) < 1e-6 && distance(a.torsoTop, b.torsoTop) < 1e-6)
             for i in 0..<3 {
@@ -1154,7 +1154,7 @@ struct PeekingFigureTests {
     @Test("A tap mid-climb leaves around the edge in profile, hidden at the jump")
     func climbRelocation() throws {
         let timeline = FigureTimeline(
-            action: .peek, entrance: .climb, reduceMotion: false, edge: .leading,
+            action: .rest, entrance: .climb, reduceMotion: false, edge: .leading,
             relocating: true, from: .trailing, pose: FigureEdgePoses.climbB
         )
         let jump = try #require(timeline.relocatesAt)
@@ -1163,7 +1163,7 @@ struct PeekingFigureTests {
         for time in samples(timeline) where time <= jump { #expect(abs(timeline.joints(at: time).facing) > 0.99) }
         // Not climbing: the usual duck.
         let peek = FigureTimeline(
-            action: .peek, entrance: .climb, reduceMotion: false, edge: .leading,
+            action: .rest, entrance: .climb, reduceMotion: false, edge: .leading,
             relocating: true, from: .trailing, pose: FigureEdgePoses.peek
         )
         #expect(abs(try #require(peek.relocatesAt) - FigureTimeline.duckDuration) < 1e-9)
@@ -1222,7 +1222,7 @@ struct PeekingFigureTests {
         #expect(timeline.joints(at: 0) == FigureEdgePoses.flagB)
         #expect(timeline.keyframes.contains { abs($0.time - jump) < 1e-9 && $0.joints == FigureEdgePoses.flagHidden })
         #expect(FigureEdgePoses.route(leaving: FigureEdgePoses.flagSwing) != nil)
-        #expect(FigureEdgePoses.route(leaving: FigureEdgePoses.peekOut) == nil)
+        #expect(FigureEdgePoses.route(leaving: FigureEdgePoses.peekTilt) == nil)
     }
 }
 

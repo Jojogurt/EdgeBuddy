@@ -103,7 +103,6 @@ struct FigurePinTests {
         (FigurePose.handstand, FigureEdges.top, FigureEdgePoses.handstand),
         (.swing, .bottom, FigureEdgePoses.swingLeft),
         (.pullUp, .bottom, FigureEdgePoses.pullTop),
-        (.peek, .trailing, FigureEdgePoses.peekOut),
         (.flag, .trailing, FigureEdgePoses.flagA),
         (.flag, .leading, FigureEdgePoses.flagA),
         (.rest, .top, FigureJoints.rest),

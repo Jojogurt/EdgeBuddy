@@ -638,6 +638,13 @@ struct PeekingFigureView: View {
             spot = current.spot
         }
         spot = min(max(spot, range.lowerBound), range.upperBound)
+        // A climb to the top of a side where nothing else fits from there (by
+        // the screen's edge it only climbs) ends the run: it leaves its own
+        // way from the top instead of standing there to lean out and go back.
+        if travelsToTop, chainLeft > 0, let rect,
+           actions(at: edge, on: rect, anchor: anchorID, from: range.lowerBound).isEmpty {
+            chainLeft = 0
+        }
         isChained = loopsFreely && chainLeft > 0
         var variation = leaving
             ? FigureVariation.leaving(exit: style.entrance, using: &generator)
