@@ -55,6 +55,8 @@ struct PeekingFigureView: View {
     @State private var entranceDelay = 0.0
     /// Restarts the entrance-delay task.
     @State private var delayID = 0
+    /// A step the timing tasks reached, handled in `onChange(of: due)`.
+    @State private var due: FigureDue?
     /// The anchor it stands on (`anchorID`) and the one it stood on until it
     /// ducked mid-relocation (`previousAnchorID`).
     @State private var anchorID: AnyHashable?
@@ -126,8 +128,16 @@ struct PeekingFigureView: View {
             guard isDelayingEntrance else { return }
             try? await Task.sleep(for: .seconds(entranceDelay))
             guard !Task.isCancelled, isDelayingEntrance else { return }
-            isDelayingEntrance = false
-            enter()
+            due = .entrance(delayID)
+        }
+        // The timing tasks only say when a step is due; it is decided here.
+        // A running task keeps the view's inputs (anchors, viewport,
+        // isScrolling, isWaiting…) from when it started — deciding there came
+        // out mid-scroll, on old frames, or stayed parked for good.
+        .onChange(of: due) { _, step in
+            guard let step else { return }
+            due = nil
+            handle(step)
         }
         .onChange(of: character.typeID) {
             // Another character: its plays differ, start over.
@@ -202,6 +212,7 @@ struct PeekingFigureView: View {
         .task(id: playID) {
             guard let start = startDate else { return }
             let played = timeline
+            let id = playID
             if isPinned, let hold = frozenElapsed {
                 // Pinned: play up to the hold frame and stop the clock there.
                 guard await sleep(until: start + hold) else { return }
@@ -218,16 +229,32 @@ struct PeekingFigureView: View {
             guard await sleep(until: start + played.duration) else { return }
             startDate = nil
             guard let pause = played.hiddenPause else {
-                // A one-shot play (looping was off when it began) just ended: if looping
-                // became allowed meanwhile (the scene turned active mid-entrance), the
-                // `idleMotionEnabled` change was skipped as busy — pick the loop up now.
-                if canLoop, hasPlayed, !isWaiting, !isPinned, !isHidden { resume() }
+                due = .playEnded(id)
                 return
             }
             // Looped cycle: behind the card now — wait, then come out elsewhere.
             isHidden = true
             try? await Task.sleep(for: .seconds(pause))
             guard !Task.isCancelled else { return }
+            due = .pauseEnded(id)
+        }
+    }
+
+    /// A step a timing task reached, with the view's current inputs.
+    private func handle(_ step: FigureDue) {
+        switch step {
+        case .entrance(let id):
+            guard id == delayID, isDelayingEntrance else { return }
+            isDelayingEntrance = false
+            enter()
+        case .playEnded(let id):
+            guard id == playID else { return }
+            // A one-shot play (looping was off when it began) just ended: if looping
+            // became allowed meanwhile (the scene turned active mid-entrance), the
+            // `idleMotionEnabled` change was skipped as busy — pick the loop up now.
+            if canLoop, hasPlayed, !isWaiting, !isPinned, !isHidden { resume() }
+        case .pauseEnded(let id):
+            guard id == playID else { return }
             if isWaiting {
                 isPending = true
             } else if canLoop {
@@ -276,8 +303,9 @@ struct PeekingFigureView: View {
     private func reclampSpot() {
         guard !isHidden, !isPinned, let rect = anchorID.flatMap(rect(for:)), edge.isSide else { return }
         let range = spotRange(at: edge, on: rect, anchor: anchorID)
-        spot = min(max(spot, range.lowerBound), range.upperBound)
-        walkTarget = min(max(walkTarget, range.lowerBound), range.upperBound)
+        guard let clamped = FigurePlacement.reclamped(spot: spot, walkTarget: walkTarget, into: range) else { return }
+        spot = clamped.spot
+        walkTarget = clamped.walkTarget
     }
 
     /// Sleeps until `date`; false when cancelled.
@@ -591,6 +619,17 @@ struct PeekingFigureView: View {
         startDate = .now
         playID += 1
     }
+}
+
+/// A step of `PeekingFigureView`'s timing tasks, for the delay or play it
+/// belongs to (`delayID` / `playID`): stale ones are dropped.
+enum FigureDue: Equatable {
+    /// The first entrance's delay is over.
+    case entrance(Int)
+    /// A one-shot play ended.
+    case playEnded(Int)
+    /// A looped cycle's pause behind the card is over.
+    case pauseEnded(Int)
 }
 
 /// Clips to `rect` in the view's own space; nil = no clip.

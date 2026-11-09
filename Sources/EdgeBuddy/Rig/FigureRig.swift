@@ -1395,6 +1395,22 @@ enum FigurePlacement {
     /// The smallest jump between two spots, as a fraction of the free width.
     static let minimumJump = 0.35
 
+    /// A side's spots moved into `range` after the viewport changed — nil =
+    /// leave them (the figure stays on its card, clipped, as while scrolling):
+    /// when the range is only a point (too little of the side shows for the
+    /// box), or when clamping would squash a climb into one spot — it would
+    /// jump there and climb in place.
+    static func reclamped(
+        spot: Double, walkTarget: Double, into range: ClosedRange<Double>
+    ) -> (spot: Double, walkTarget: Double)? {
+        guard range.upperBound - range.lowerBound > 1e-6 else { return nil }
+        let clamp = { (value: Double) in min(max(value, range.lowerBound), range.upperBound) }
+        let moved = (spot: clamp(spot), walkTarget: clamp(walkTarget))
+        let travels = abs(walkTarget - spot) > 1e-6
+        if travels, abs(moved.walkTarget - moved.spot) <= 1e-6 { return nil }
+        return moved
+    }
+
     /// A fresh spot for an entrance.
     static func random(using generator: inout some RandomNumberGenerator) -> Double {
         Double.random(in: 0...1, using: &generator)

@@ -6,9 +6,9 @@ struct FigureAnchorItem {
     let id: AnyHashable
     let edges: FigureEdges
     let bounds: Anchor<CGRect>
-    /// Visible area of the scroll view the view sits in, in global space;
+    /// Visible areas of the scroll views the view sits in, in global space;
     /// nil = not in a scroll view (or not measured yet).
-    var region: CGRect?
+    var region: FigureViewport.Parts?
 }
 
 /// A marked view resolved into the stage's space.
@@ -117,7 +117,7 @@ extension View {
 private struct FigureAnchorModifier: ViewModifier {
     let id: AnyHashable
     let edges: FigureEdges
-    @State private var region: CGRect?
+    @State private var region: FigureViewport.Parts?
 
     func body(content: Content) -> some View {
         content
@@ -126,11 +126,12 @@ private struct FigureAnchorModifier: ViewModifier {
             // (a pager inside the screen's scroll view). Neither moves while its
             // own content scrolls (rounded: the measure jitters by ~1e-14 from
             // frame to frame), so this fires on layout and when a bar resizes.
-            .onGeometryChange(for: CGRect?.self) { proxy in
-                FigureViewport.region(
+            .onGeometryChange(for: FigureViewport.Parts?.self) { proxy in
+                FigureViewport.parts(
                     vertical: proxy.bounds(of: .scrollView(axis: .vertical)),
                     horizontal: proxy.bounds(of: .scrollView(axis: .horizontal)),
-                    origin: proxy.frame(in: .global).origin
+                    origin: proxy.frame(in: .global).origin,
+                    width: proxy.size.width
                 )
             } action: { region = $0 }
             .anchorPreference(key: FigureAnchorsKey.self, value: .bounds) {
@@ -165,18 +166,49 @@ struct FigureScrollTracker: Equatable {
 }
 
 enum FigureViewport {
-    /// The visible area around an anchor, in global space, from the bounds of
-    /// the closest vertical and horizontal scroll views (each in the anchor's
-    /// local space; `origin` = the anchor's global origin). Y comes from the
-    /// vertical one — not from a horizontal pager nested in it, which moves
-    /// with the vertical scroll and is only about as tall as its cards — and X
-    /// from both (the pager cuts off the cards of other pages). One alone is
-    /// used as it is; none = nil (not in a scroll view).
-    static func region(vertical: CGRect?, horizontal: CGRect?, origin: CGPoint) -> CGRect? {
+    /// The visible areas of the closest vertical and horizontal scroll views
+    /// around an anchor, in global space (rounded).
+    struct Parts: Equatable, Sendable {
+        var vertical: CGRect?
+        /// Under a vertical one only across (y and height zero): the pager
+        /// moves with the vertical scroll, so its full rect would change on
+        /// every scroll frame.
+        var horizontal: CGRect?
+        /// The anchor lies across within the pager's bounds — a card of the
+        /// page shown, not one paged away or peeking in from the next page.
+        var isOnPage = true
+    }
+
+    /// The scroll views' bounds (each in the anchor's local space; `origin` =
+    /// the anchor's global origin, `width` its width) in global space; none =
+    /// nil (not in a scroll view).
+    static func parts(vertical: CGRect?, horizontal: CGRect?, origin: CGPoint, width: CGFloat) -> Parts? {
         // Rounded to 1/100 pt: the anchor's origin and the scroll view's bounds
         // carry floating-point noise that changes on every scroll frame.
         let global = { (rect: CGRect) in rounded(rect.offsetBy(dx: origin.x, dy: origin.y)) }
-        switch (vertical.map(global), horizontal.map(global)) {
+        guard vertical != nil || horizontal != nil else { return nil }
+        // Under a vertical one only the pager's X is used (`region`).
+        let across = vertical == nil
+            ? horizontal.map(global)
+            : horizontal.map { CGRect(x: global($0).minX, y: 0, width: global($0).width, height: 0) }
+        let isOnPage = horizontal.map { $0.minX <= 0.5 && width <= $0.maxX + 0.5 } ?? true
+        return Parts(vertical: vertical.map(global), horizontal: across, isOnPage: isOnPage)
+    }
+
+    /// The visible area around an anchor, in global space. Y comes from the
+    /// vertical scroll view — not from a horizontal pager nested in it, which
+    /// moves with the vertical scroll and is only about as tall as its cards —
+    /// and X from both (the pager cuts off the cards of other pages). One
+    /// alone is used as it is.
+    ///
+    /// `pagerBleed`: how far X may reach past the pager's bounds (still inside
+    /// the vertical one) for a card of the page shown. A pager's bounds leave
+    /// out its content margins, so with `.contentMargins` they end at the
+    /// card's edges and a side figure would be cut there although the margin
+    /// beside the card is empty. Cards of other pages get none: the margin
+    /// would put their side on screen, and the figure would come out there.
+    static func region(_ parts: Parts?, pagerBleed: CGFloat = 0) -> CGRect? {
+        switch (parts?.vertical, parts?.horizontal) {
         case (nil, nil):
             return nil
         case let (vertical?, nil):
@@ -184,10 +216,20 @@ enum FigureViewport {
         case let (nil, horizontal?):
             return horizontal
         case let (vertical?, horizontal?):
-            let minX = max(vertical.minX, horizontal.minX)
-            let maxX = min(vertical.maxX, horizontal.maxX)
+            let pagerBleed = parts?.isOnPage == true ? pagerBleed : 0
+            let minX = max(vertical.minX, horizontal.minX - pagerBleed)
+            let maxX = min(vertical.maxX, horizontal.maxX + pagerBleed)
             return CGRect(x: minX, y: vertical.minY, width: max(0, maxX - minX), height: vertical.height)
         }
+    }
+
+    /// `parts` + `region` in one step (tests, previews).
+    static func region(
+        vertical: CGRect?, horizontal: CGRect?, origin: CGPoint, width: CGFloat = 0, pagerBleed: CGFloat = 0
+    ) -> CGRect? {
+        region(
+            parts(vertical: vertical, horizontal: horizontal, origin: origin, width: width), pagerBleed: pagerBleed
+        )
     }
 
     private static func rounded(_ rect: CGRect) -> CGRect {
@@ -244,6 +286,7 @@ private struct FigureStageModifier: ViewModifier {
             .overlayPreferenceValue(FigureAnchorsKey.self) { items in
                 if isEnabled, PeekingFigureMetrics.isShown(dynamicTypeSize: dynamicTypeSize) {
                     let character = characterOverride ?? HumanRig.character()
+                    let metrics = PeekingFigureMetrics(height: height, geometry: character.geometry)
                     GeometryReader { proxy in
                         let origin = proxy.frame(in: .global).origin
                         let stage = CGRect(origin: .zero, size: proxy.size)
@@ -252,7 +295,11 @@ private struct FigureStageModifier: ViewModifier {
                                 FigureAnchorFrame(
                                     id: $0.id, edges: $0.edges.physical(for: layoutDirection), rect: proxy[$0.bounds],
                                     viewport: isBounded
-                                        ? FigureViewport.resolve(stage: stage, region: $0.region, origin: origin) : nil
+                                        ? FigureViewport.resolve(
+                                            stage: stage,
+                                            region: FigureViewport.region($0.region, pagerBleed: metrics.pagerBleed),
+                                            origin: origin
+                                        ) : nil
                                 )
                             },
                             viewport: isBounded ? stage : nil,
@@ -262,7 +309,7 @@ private struct FigureStageModifier: ViewModifier {
                             loops: loops,
                             color: color,
                             character: character,
-                            metrics: PeekingFigureMetrics(height: height, geometry: character.geometry),
+                            metrics: metrics,
                             idleMotionEnabled: idleMotionEnabled,
                             lowPowerMode: lowPowerMode,
                             pin: pin?.physical(for: layoutDirection),

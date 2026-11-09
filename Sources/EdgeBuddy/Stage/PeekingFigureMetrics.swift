@@ -112,6 +112,13 @@ struct PeekingFigureMetrics: Equatable, Sendable {
         )
     }
 
+    /// How far a side figure may reach past a pager's bounds: its side box.
+    /// Those bounds leave out the pager's content margins (they end at the
+    /// card), so without it the figure is cut at the card's edge.
+    var pagerBleed: CGFloat {
+        max(size(for: .trailing).width, size(for: .leading).width)
+    }
+
     /// A side closer than this to the screen's edge only climbs (28 pt at
     /// the default height: wider than the usual 16 pt gutter).
     var screenEdgeGap: CGFloat { 28 * height / Self.defaultHeight }

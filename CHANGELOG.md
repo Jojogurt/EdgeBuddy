@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## 0.3.3 — 2026-11-09
+
+- Fix: a figure on the side of a card in a horizontal pager with `.contentMargins` was cut at
+  the card's edge although the margin beside it was empty. A pager's bounds leave out its content
+  margins, so since 0.3.1 they ended at the card. The visible area may now reach past the pager's
+  bounds by the figure's side box (never past the vertical scroll view), so the figure uses the
+  margin. Only the card of the page shown gets it: a card of the next page peeking into the
+  margin never gets the figure on its side. The measured area no longer changes on every
+  scroll frame of a card in a pager.
+- Fix: after a cycle's pause behind the card the figure could come out mid-scroll, from
+  frames of a few seconds ago, or stay hidden until the next scroll. The timing tasks kept
+  the view's inputs from when they started; they now only signal, and the stage decides with
+  the current ones.
+- Fix: a viewport change once a scroll stopped (pull to refresh, a bar resizing) could clamp
+  a climb into one spot — the figure jumped to the top of the card and climbed in place. Such
+  a change now leaves the climb on its path.
+
 ## 0.3.2 — 2026-11-08
 
 - Fix: a figure on a card's side could jump when the screen scrolled. The large title

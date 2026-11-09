@@ -103,6 +103,101 @@ struct StageAnywhereTests {
         #expect(region == CGRect(x: 20, y: 153, width: 300, height: 608))
     }
 
+    /// A 390 pt screen with a pager whose `.contentMargins` are 16 pt: its
+    /// bounds (as SwiftUI reports them) end at the card, x 16…374.
+    private func marginPager(offset: CGFloat) -> (vertical: CGRect, horizontal: CGRect, origin: CGPoint) {
+        let card = CGPoint(x: 16, y: 400 - offset)
+        let screen = CGRect(x: 0, y: 153, width: 390, height: 608)
+        let pagerBounds = CGRect(x: 16, y: card.y, width: 358, height: 296)
+        let local = { (rect: CGRect) in rect.offsetBy(dx: -card.x, dy: -card.y) }
+        return (local(screen), local(pagerBounds), card)
+    }
+
+    @Test("Regression 0.3.1: a pager with content margins leaves its margins to a side figure")
+    func regionPagerBleedsIntoMargins() {
+        let pager = marginPager(offset: 0)
+        let tight = FigureViewport.region(vertical: pager.vertical, horizontal: pager.horizontal, origin: pager.origin)
+        #expect(tight?.minX == 16 && tight?.maxX == 374)
+        let region = FigureViewport.region(
+            vertical: pager.vertical, horizontal: pager.horizontal, origin: pager.origin, width: 358, pagerBleed: 10
+        )
+        #expect(region == CGRect(x: 6, y: 153, width: 378, height: 608))
+    }
+
+    @Test("The pager bleed never reaches past the vertical scroll view (the screen)")
+    func regionPagerBleedCappedByScreen() {
+        let pager = marginPager(offset: 0)
+        let region = FigureViewport.region(
+            vertical: pager.vertical, horizontal: pager.horizontal, origin: pager.origin, width: 358,
+            pagerBleed: PeekingFigureMetrics().pagerBleed
+        )
+        #expect(region == CGRect(x: 0, y: 153, width: 390, height: 608))
+    }
+
+    @Test("With the pager bleed the region still holds still while the screen scrolls")
+    func regionPagerBleedStableWhileScrolling() {
+        let bleed = PeekingFigureMetrics().pagerBleed
+        let regions = stride(from: CGFloat(0), through: 400, by: 25).map { offset in
+            let pager = marginPager(offset: offset)
+            return FigureViewport.region(
+                vertical: pager.vertical, horizontal: pager.horizontal, origin: pager.origin, width: 358,
+                pagerBleed: bleed
+            )
+        }
+        #expect(Set(regions.map { $0.map { [$0.minX, $0.minY, $0.width, $0.height] } }).count == 1)
+    }
+
+    @Test("Regression: a viewport change never squashes a climb into one spot (climbing in place)")
+    func reclampKeepsTheClimb() {
+        // Climbing from 0.85 up to 0.0, the side mostly off screen (pull to
+        // refresh): the range is a point — leave the climb alone.
+        #expect(FigurePlacement.reclamped(spot: 0.85, walkTarget: 0, into: 0...0) == nil)
+        // A range that would squash both ends onto 0.2 — left alone too.
+        #expect(FigurePlacement.reclamped(spot: 0.85, walkTarget: 0.9, into: 0...0.2) == nil)
+        // A real resize still clamps a climb that keeps some travel.
+        let moved = FigurePlacement.reclamped(spot: 0.85, walkTarget: 0, into: 0.1...0.6)
+        #expect(moved?.spot == 0.6 && moved?.walkTarget == 0.1)
+        // Standing still: clamped as before.
+        let still = FigurePlacement.reclamped(spot: 0.9, walkTarget: 0.9, into: 0...0.5)
+        #expect(still?.spot == 0.5 && still?.walkTarget == 0.5)
+    }
+
+    @Test("The measured parts hold still while the screen scrolls (no state update per frame)")
+    func partsStableWhileScrolling() {
+        let parts = stride(from: CGFloat(0), through: 400, by: 25).map { offset in
+            let pager = marginPager(offset: offset)
+            return FigureViewport.parts(
+                vertical: pager.vertical, horizontal: pager.horizontal, origin: pager.origin, width: 358
+            )
+        }
+        #expect(Set(parts.map { "\(String(describing: $0))" }).count == 1)
+    }
+
+    @Test("Regression: the next page's card peeking into the margin gets no bleed (the figure stays off it)")
+    func regionPagerBleedKeepsOtherPagesOut() {
+        // NextLeg's carousel: 16 pt content margins, 12 pt between cards — the
+        // next page's card starts at x 386, 4 pt before the screen's edge.
+        let origin = CGPoint(x: 386, y: 400)
+        let vertical = CGRect(x: -386, y: -247, width: 390, height: 608)
+        let horizontal = CGRect(x: -370, y: 0, width: 358, height: 296)
+        let bleed = PeekingFigureMetrics().pagerBleed
+        let parts = FigureViewport.parts(vertical: vertical, horizontal: horizontal, origin: origin, width: 358)
+        #expect(parts?.isOnPage == false)
+        let region = FigureViewport.region(parts, pagerBleed: bleed)
+        #expect(region == CGRect(x: 16, y: 153, width: 358, height: 608))
+        // Its leading side (x 386) is not in it, so the figure never comes out there.
+        let card = CGRect(x: 386, y: 400, width: 358, height: 296)
+        let sizes = PeekingFigureMetrics().sizes
+        #expect(!FigureAnchorPicker.isEligible(rect: card, edge: .leading, viewport: region, sizes: sizes))
+        // The card of the page shown keeps the bleed.
+        let shown = marginPager(offset: 0)
+        let onPage = FigureViewport.parts(
+            vertical: shown.vertical, horizontal: shown.horizontal, origin: shown.origin, width: 358
+        )
+        #expect(onPage?.isOnPage == true)
+        #expect(FigureViewport.region(onPage, pagerBleed: bleed)?.minX == 0)
+    }
+
     @Test("Regression 0.3.0: the region does not move while the screen scrolls vertically")
     func regionStableWhileScrolling() {
         let regions = stride(from: CGFloat(0), through: 400, by: 25).map { offset in
