@@ -22,6 +22,12 @@ public struct FigureStyle: Equatable, Sendable {
     /// out at once. Only the first entrance waits: later cycles have their
     /// own pauses and a tap moves it at once.
     public var appearDelay: ClosedRange<Double>
+    /// How many actions the figure plays each time it comes out, a random
+    /// count in this range: between them it stands a moment (the same action
+    /// may come again), then it goes back behind the card. Only while it
+    /// loops; a scroll ends the run after the action playing. Counts below
+    /// 1 count as 1; `1...1` (the default) = one action per appearance.
+    public var actionsPerCycle: ClosedRange<Int>
 
     /// The default `appearDelay`, seconds.
     public static let defaultAppearDelay: ClosedRange<Double> = 1.5...3.0
@@ -34,13 +40,24 @@ public struct FigureStyle: Equatable, Sendable {
     ///   - appearDelay: seconds hidden before the first entrance after the
     ///     stage appears, drawn at random from this range; 1.5…3 by default,
     ///     `0...0` for none.
+    ///   - actionsPerCycle: how many actions it plays each time it comes
+    ///     out, drawn from this range; `1...1` by default.
     public init(
         entrance: FigureEntrance = .climb, tempo: Double = 1,
-        appearDelay: ClosedRange<Double> = FigureStyle.defaultAppearDelay
+        appearDelay: ClosedRange<Double> = FigureStyle.defaultAppearDelay,
+        actionsPerCycle: ClosedRange<Int> = 1...1
     ) {
         self.entrance = entrance
         self.tempo = tempo
         self.appearDelay = appearDelay
+        self.actionsPerCycle = actionsPerCycle
+    }
+
+    /// How many actions the next appearance plays: a random
+    /// `actionsPerCycle`, at least 1.
+    func actionCount(using generator: inout some RandomNumberGenerator) -> Int {
+        let range = max(actionsPerCycle.lowerBound, 1)...max(actionsPerCycle.upperBound, 1)
+        return Int.random(in: range, using: &generator)
     }
 
     /// The wait before the first entrance: a random `appearDelay`, scaled

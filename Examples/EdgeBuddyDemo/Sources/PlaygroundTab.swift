@@ -16,6 +16,20 @@ struct PlaygroundTab: View {
         }
     }
 
+    /// How many actions it plays each time it comes out.
+    private enum Run: String, CaseIterable {
+        case one = "1", upToTwo = "1–2", upToThree = "1–3", twoOrThree = "2–3"
+
+        var range: ClosedRange<Int> {
+            switch self {
+            case .one: 1...1
+            case .upToTwo: 1...2
+            case .upToThree: 1...3
+            case .twoOrThree: 2...3
+            }
+        }
+    }
+
     /// Three looks of the built-in `HumanFigure`, and a character of its own.
     private enum Head: String, CaseIterable {
         case circle = "Circle", bear = "🐻", star = "Star", ghost = "Ghost"
@@ -37,6 +51,7 @@ struct PlaygroundTab: View {
     /// Launch with `-EdgeBuddyHead Ghost` (or 🐻, Star) to start with another figure.
     @State private var head = Head(rawValue: UserDefaults.standard.string(forKey: "EdgeBuddyHead") ?? "") ?? .circle
     @State private var color = Color.green
+    @State private var run = Run.one
     @State private var height: CGFloat = 56
     @State private var opacity = 1.0
     @State private var tempo = 1.0
@@ -73,7 +88,9 @@ struct PlaygroundTab: View {
                 .padding(.top, height)
             }
             .figureStage(
-                style: FigureStyle(entrance: entrance, tempo: tempo, appearDelay: delay.range),
+                style: FigureStyle(
+                    entrance: entrance, tempo: tempo, appearDelay: delay.range, actionsPerCycle: run.range
+                ),
                 isWaiting: waiting,
                 loops: loops
             )
@@ -125,6 +142,9 @@ struct PlaygroundTab: View {
             }
             Picker("Appear delay", selection: $delay) {
                 ForEach(Delay.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            Picker("Actions per appearance", selection: $run) {
+                ForEach(Run.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
             Toggle("Loops", isOn: $loops)
             Toggle("Haptics", isOn: $haptics)

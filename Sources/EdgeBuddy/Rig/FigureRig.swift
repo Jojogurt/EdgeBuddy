@@ -126,6 +126,46 @@ struct FigureVariation: Equatable, Sendable {
             tempoScale: .random(in: tempoScaleRange, using: &generator)
         )
     }
+
+    /// This cycle as one action of a run (`FigureStyle.actionsPerCycle`):
+    /// while the run `continues` it ends standing — no exit, so no
+    /// `holdAfter` and no hidden pause; the next action's `holdBefore` is
+    /// the pause between them.
+    func chained(continues: Bool) -> FigureVariation {
+        guard continues else { return self }
+        var variation = self
+        variation.exit = nil
+        variation.holdAfter = 0
+        variation.hiddenPause = 0
+        return variation
+    }
+
+    /// Going back behind the card at once (a run cut short by a scroll):
+    /// the rest pose once, no holds, out with `exit`, then hidden a while.
+    static func leaving(exit: FigureEntrance, using generator: inout some RandomNumberGenerator) -> FigureVariation {
+        FigureVariation(
+            repeats: 1, exit: exit, hiddenPause: .random(in: hiddenPauseRange, using: &generator)
+        )
+    }
+}
+
+/// What comes after one action of a run (`FigureStyle.actionsPerCycle`).
+enum FigureChain {
+    enum Step: Equatable {
+        /// The next action of the run, from where it stands.
+        case next
+        /// Back behind the card now (the run is over or a scroll cut it).
+        case leave
+        /// Stays standing (a celebration holds the stage, or idle motion is off).
+        case stand
+    }
+
+    /// After an action that ended standing because the run went on, with
+    /// `left` actions still owed.
+    static func afterAction(left: Int, isScrolling: Bool, canLoop: Bool, isWaiting: Bool) -> Step {
+        if isWaiting || !canLoop { return .stand }
+        return left > 0 && !isScrolling ? .next : .leave
+    }
 }
 
 /// Joint angles of the figure rig, in degrees. A segment at angle `a` points

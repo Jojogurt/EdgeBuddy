@@ -57,6 +57,10 @@ struct PeekingFigureView: View {
     @State private var delayID = 0
     /// A step the timing tasks reached, handled in `onChange(of: due)`.
     @State private var due: FigureDue?
+    /// Actions still owed after the one playing (`FigureStyle.actionsPerCycle`).
+    @State private var chainLeft = 0
+    /// The action playing ends standing because the run goes on.
+    @State private var isChained = false
     /// The anchor it stands on (`anchorID`) and the one it stood on until it
     /// ducked mid-relocation (`previousAnchorID`).
     @State private var anchorID: AnyHashable?
@@ -110,6 +114,8 @@ struct PeekingFigureView: View {
         .onAppear { appear() }
         .onDisappear {
             // The next appearance climbs in again.
+            chainLeft = 0
+            isChained = false
             isPinned = false
             frozenElapsed = nil
             startDate = nil
@@ -160,6 +166,8 @@ struct PeekingFigureView: View {
             }
         }
         .onChange(of: isScrolling) { _, scrolling in
+            // A scroll ends a run: the action playing finishes, then it leaves.
+            if scrolling { chainLeft = 0 }
             if !scrolling, isParked, !isWaiting { comeOut() }
         }
         // A hash, not an array: this expression runs on every scroll frame.
@@ -249,6 +257,24 @@ struct PeekingFigureView: View {
             enter()
         case .playEnded(let id):
             guard id == playID else { return }
+            if isChained {
+                // One action of a run ended standing: the next one, or leave.
+                isChained = false
+                switch FigureChain.afterAction(
+                    left: chainLeft, isScrolling: isScrolling, canLoop: canLoop, isWaiting: isWaiting
+                ) {
+                case .next:
+                    chainLeft -= 1
+                    play(entrance: nil, chainStep: true)
+                case .leave:
+                    chainLeft = 0
+                    play(entrance: nil, action: FigureActionName.rest, leaving: true)
+                case .stand:
+                    chainLeft = 0
+                    if isWaiting { isPending = true }
+                }
+                return
+            }
             // A one-shot play (looping was off when it began) just ended: if looping
             // became allowed meanwhile (the scene turned active mid-entrance), the
             // `idleMotionEnabled` change was skipped as busy — pick the loop up now.
@@ -445,6 +471,8 @@ struct PeekingFigureView: View {
     }
 
     private func appear() {
+        chainLeft = 0
+        isChained = false
         startDate = nil
         hasPlayed = false
         isHidden = true
@@ -472,6 +500,8 @@ struct PeekingFigureView: View {
             pin, anchors: anchors, viewport: viewport, metrics: metrics, style: style, character: character
         ) else { return false }
         isPinned = true
+        chainLeft = 0
+        isChained = false
         isDelayingEntrance = false
         isParked = false
         isPending = false
@@ -524,7 +554,14 @@ struct PeekingFigureView: View {
         play(entrance: style.entrance, action: override)
     }
 
-    private func play(entrance: FigureEntrance?, action override: String? = nil, relocating: Bool = false) {
+    /// - Parameters:
+    ///   - chainStep: the next action of a run, from where it stands (the
+    ///     same action may come again).
+    ///   - leaving: straight back behind the card (`FigureVariation.leaving`).
+    private func play(
+        entrance: FigureEntrance?, action override: String? = nil, relocating: Bool = false,
+        chainStep: Bool = false, leaving: Bool = false
+    ) {
         var generator = SystemRandomNumberGenerator()
         // Start from wherever the figure is right now (mid-walk included).
         let current = position(at: elapsed(at: .now))
@@ -558,9 +595,24 @@ struct PeekingFigureView: View {
         } else {
             let available = rect.map { actions(at: edge, on: $0, anchor: anchorID, from: popsUp ? nil : current.spot) }
                 ?? character.actions(at: edge, room: room, atScreenEdge: false)
+            if chainStep, available.isEmpty {
+                // Nothing fits from here (a climb ended at the top of a side
+                // by the screen's edge): the run ends.
+                chainLeft = 0
+                play(entrance: nil, action: FigureActionName.rest, leaving: true)
+                return
+            }
             played = FigureRepertoire.next(
-                after: lastAction, from: available, fallback: FigureActionName.rest, using: &generator
+                after: chainStep ? nil : lastAction, from: available, fallback: FigureActionName.rest, using: &generator
             )
+        }
+        // A fresh appearance draws how many actions it plays; other plays
+        // (after a celebration, Reduce Motion's rest, leaving) are single.
+        let loopsFreely = canLoop && override == nil
+        if popsUp, loopsFreely {
+            chainLeft = style.actionCount(using: &generator) - 1
+        } else if !chainStep {
+            chainLeft = 0
         }
         lastAction = played
         let info = character.info(played, at: edge)
@@ -586,9 +638,13 @@ struct PeekingFigureView: View {
             spot = current.spot
         }
         spot = min(max(spot, range.lowerBound), range.upperBound)
-        var variation = canLoop && override == nil
-            ? FigureVariation.random(repeats: info.repeatRange, exit: style.entrance, using: &generator)
-            : .standard
+        isChained = loopsFreely && chainLeft > 0
+        var variation = leaving
+            ? FigureVariation.leaving(exit: style.entrance, using: &generator)
+            : loopsFreely
+                ? FigureVariation.random(repeats: info.repeatRange, exit: style.entrance, using: &generator)
+                    .chained(continues: isChained)
+                : .standard
         // Travelling actions: as many beats as fit from this spot (the top
         // walks toward the wider side).
         let forward = edge == .top && spot > 0.5 ? -1.0 : 1.0

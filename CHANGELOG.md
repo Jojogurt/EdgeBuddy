@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## Unreleased
+
+- New: `FigureStyle.actionsPerCycle` — how many actions the figure plays each time it comes
+  out, drawn from the range (`1...1` by default, as before). Between them it stands a moment
+  on the same edge (a climb or a worm walk may carry it along); the same action may come again,
+  only an action with room from where it stands is drawn (no second climb after reaching the
+  top). A scroll ends the run once the action playing finishes, then it goes back behind the
+  card; a tap starts a new run elsewhere. Only while it loops. Demo: Playground's "Actions per
+  appearance".
+
 ## 0.3.3 — 2026-11-09
 
 - Fix: a figure on the side of a card in a horizontal pager with `.contentMargins` was cut at

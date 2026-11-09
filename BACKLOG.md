@@ -4,6 +4,34 @@ Persistent record of design discussions, decisions, and phase status. New entrie
 
 ---
 
+## Phase — Chained actions in one cycle (2026-11-09)
+
+Context: today a cycle is entrance → hold → ONE action (beat repeats) → hold → exit → hidden pause
+(`FigureVariation`). Asked from NextLeg: come out, play one action, pause, a second, maybe a third,
+then go back — varied. Most of the mechanism exists: `exit: nil` ends a play standing, `play(entrance: nil)`
+(as in `resume()`) plays the next action from where it stands, `previousPose` blends from the shown pose (taps).
+
+Decisions:
+- Count: set by the app — new `FigureStyle` parameter (e.g. `actionsPerCycle: ClosedRange<Int>`, default `1...1`) so current behaviour and existing apps stay unchanged; NextLeg picks its range.
+- Movement: only along the same edge — travelling actions (climb, worm walk) may move it along it; no edge changes mid-sequence (no new transition animations).
+- Scroll mid-sequence: the current action finishes, the rest of the sequence is dropped and it goes back behind the card (no surprises while scrolling).
+- Repeats: the same action may come again in a sequence (wave, pause, wave again) — no "never twice in a row" rule inside a sequence. Travelling actions only while they have room: the room check per step (`travelRoom` from the spot reached) already rules out a second climb after one ended at the top (there is no way down yet).
+
+Edge cases to cover in the plan:
+- The next action must fit from the current spot (`travelRoom` from the spot reached; a climb that ended at the top has no room to climb again; at a screen-edge side only the climb is allowed → sequence ends there).
+- Within a sequence repeats are allowed (so not `FigureRepertoire.next(after:)` there); across cycles the first action still differs from the last one. Holds between actions from `holdAfter`/`holdBefore` ranges.
+- Tap mid-sequence relocates as today and starts a fresh sequence; `isWaiting`, Low Power, Reduce Motion and a pin end the sequence (rest pose / pin rules as today).
+- Timing goes through the `due` → `onChange` path (0.3.3), never decided inside the task.
+- Tests: sequence length within the range, `1...1` identical to today, no repeat, scroll drops the rest, room check per step.
+
+Plan: `/Users/kked/.claude/plans/zazzy-sauteeing-peach.md`. Done: `FigureStyle.actionsPerCycle` + `actionCount`, `FigureChain.afterAction`, `FigureVariation.chained/leaving` (no exit → the rig skips `holdAfter`, so the pause between actions is the next one's `holdBefore`), run state in `PeekingFigureView` (`chainLeft`, `isChained`, handled on `.playEnded`), `ChainedActionsTests`, demo picker. 129 tests green (macOS). Not yet watched on a simulator.
+
+- [x] Discussed
+- [ ] Researched
+- [x] Planned
+- [x] Executed
+- [ ] Committed
+
 ## Audit 0.2.0 → roadmap 0.3.0 (2026-11-07)
 
 Context: audit of the 0.2.0 public repo (code, API, a11y, tests/CI, README, demo) plus a
@@ -65,6 +93,7 @@ Decisions:
 ---
 
 ## Deferred (parking lot)
+- Climb down a side (2026-11-09): a descent so a side figure can climb again after reaching the top, or travel both ways in a chained sequence. Options: the climb timeline played in reverse (cheap; check the grip/foot order still reads as climbing, not sliding) vs a dedicated descent animation (looking down, feet first). Would also give a side exit other than the reversed entrance.
 
 - Custom characters: travel under a bottom edge (`travelRoom` is 0 there, kept for the human); a per-action entrance/exit; exposing the stage's heading to `draw` instead of mirroring.
 - Phase 5 follow-ups: visual check of the demo on macOS (built only); `HumanFigure.actions(at:)` describes whole plays — consider beats if users build on the human's motion.

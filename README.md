@@ -145,7 +145,8 @@ All settings are environment values — set them on the stage or anywhere
 above it (for example once at your app's root):
 
 ```swift
-.figureStage(style: FigureStyle(entrance: .spring, tempo: 1.2, appearDelay: 0.8...2))
+.figureStage(style: FigureStyle(entrance: .spring, tempo: 1.2, appearDelay: 0.8...2,
+                                 actionsPerCycle: 1...3))  // 1–3 actions each time it comes out
 .figureColor(.accentColor)      // single colour; dynamic colours follow dark mode
 .figureOpacity(0.8)             // softer on the cards; 1 by default
 .figureHeight(56)               // points; everything else scales from it
