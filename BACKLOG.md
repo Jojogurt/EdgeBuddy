@@ -4,34 +4,6 @@ Persistent record of design discussions, decisions, and phase status. New entrie
 
 ---
 
-## Phase — Chained actions in one cycle (2026-11-09)
-
-Context: today a cycle is entrance → hold → ONE action (beat repeats) → hold → exit → hidden pause
-(`FigureVariation`). Asked from NextLeg: come out, play one action, pause, a second, maybe a third,
-then go back — varied. Most of the mechanism exists: `exit: nil` ends a play standing, `play(entrance: nil)`
-(as in `resume()`) plays the next action from where it stands, `previousPose` blends from the shown pose (taps).
-
-Decisions:
-- Count: set by the app — new `FigureStyle` parameter (e.g. `actionsPerCycle: ClosedRange<Int>`, default `1...1`) so current behaviour and existing apps stay unchanged; NextLeg picks its range.
-- Movement: only along the same edge — travelling actions (climb, worm walk) may move it along it; no edge changes mid-sequence (no new transition animations).
-- Scroll mid-sequence: the current action finishes, the rest of the sequence is dropped and it goes back behind the card (no surprises while scrolling).
-- Repeats: the same action may come again in a sequence (wave, pause, wave again) — no "never twice in a row" rule inside a sequence. Travelling actions only while they have room: the room check per step (`travelRoom` from the spot reached) already rules out a second climb after one ended at the top (there is no way down yet).
-
-Edge cases to cover in the plan:
-- The next action must fit from the current spot (`travelRoom` from the spot reached; a climb that ended at the top has no room to climb again; at a screen-edge side only the climb is allowed → sequence ends there).
-- Within a sequence repeats are allowed (so not `FigureRepertoire.next(after:)` there); across cycles the first action still differs from the last one. Holds between actions from `holdAfter`/`holdBefore` ranges.
-- Tap mid-sequence relocates as today and starts a fresh sequence; `isWaiting`, Low Power, Reduce Motion and a pin end the sequence (rest pose / pin rules as today).
-- Timing goes through the `due` → `onChange` path (0.3.3), never decided inside the task.
-- Tests: sequence length within the range, `1...1` identical to today, no repeat, scroll drops the rest, room check per step.
-
-Plan: `/Users/kked/.claude/plans/zazzy-sauteeing-peach.md`. Done: `FigureStyle.actionsPerCycle` + `actionCount`, `FigureChain.afterAction`, `FigureVariation.chained/leaving` (no exit → the rig skips `holdAfter`, so the pause between actions is the next one's `holdBefore`), run state in `PeekingFigureView` (`chainLeft`, `isChained`, handled on `.playEnded`), `ChainedActionsTests`, demo picker. 129 tests green (macOS). Not yet watched on a simulator.
-
-- [x] Discussed
-- [ ] Researched
-- [x] Planned
-- [x] Executed
-- [ ] Committed
-
 ## Audit 0.2.0 → roadmap 0.3.0 (2026-11-07)
 
 Context: audit of the 0.2.0 public repo (code, API, a11y, tests/CI, README, demo) plus a
@@ -106,6 +78,7 @@ Decisions:
 - Naming consistency: `peekingFigure` vs the `figureX` family.
 
 ## Completed (collapsed)
+- Chained actions in one cycle (2026-11-09): `FigureStyle.actionsPerCycle` (default 1...1), repeats allowed, same edge only, room check per step (no climb in place), scroll ends the run after the action playing, demo picker; pause between actions = next `holdBefore` (no exit → rig skips `holdAfter`) — 297d990
 - Fix 0.3.3 — side figure in a pager with content margins and during pull to refresh (2026-11-09): pager bleed (side box) only for the card of the page shown, pager part stored across only; timing tasks signal via `onChange` (stale inputs made it come out mid-scroll or stay parked); reclamp never squashes a climb into one spot (climbing in place) — 3e152bd
 - Fix 0.3.2 — side figure jumped when a large title collapsed mid-scroll (2026-11-08): no reclamp for viewport changes while scrolling (title snap-back reports as `decelerating`), region rounded to 1/100 pt (float jitter every frame), demo Pager tab; kept by design: coming out on the visible strip of a card mostly under the bar — 824df9d
 - Fix 0.3.1 — anchor in a horizontal pager nested in a vertical ScrollView (2026-11-07): viewport Y from the vertical scroll view, X from the pager; side reclamp deferred to scroll end — 63bfc43

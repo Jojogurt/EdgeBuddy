@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
-## Unreleased
+## 0.4.0 — 2026-11-09
 
 - New: `FigureStyle.actionsPerCycle` — how many actions the figure plays each time it comes
   out, drawn from the range (`1...1` by default, as before). Between them it stands a moment
