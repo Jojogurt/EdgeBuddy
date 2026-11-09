@@ -77,6 +77,7 @@ Decisions:
 - Naming consistency: `peekingFigure` vs the `figureX` family.
 
 ## Completed (collapsed)
+- Fix 0.3.3 — side figure in a pager with content margins and during pull to refresh (2026-11-09): pager bleed (side box) only for the card of the page shown, pager part stored across only; timing tasks signal via `onChange` (stale inputs made it come out mid-scroll or stay parked); reclamp never squashes a climb into one spot (climbing in place) — 3e152bd
 - Fix 0.3.2 — side figure jumped when a large title collapsed mid-scroll (2026-11-08): no reclamp for viewport changes while scrolling (title snap-back reports as `decelerating`), region rounded to 1/100 pt (float jitter every frame), demo Pager tab; kept by design: coming out on the visible strip of a card mostly under the bar — 824df9d
 - Fix 0.3.1 — anchor in a horizontal pager nested in a vertical ScrollView (2026-11-07): viewport Y from the vertical scroll view, X from the pager; side reclamp deferred to scroll end — 63bfc43
 - Phase 3 — Demo + README GIF (2026-11-07): multiplatform demo xcodeproj, 4 tabs, CI build, README GIF — 42222f2
