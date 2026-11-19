@@ -285,7 +285,7 @@ private struct FigureStageModifier: ViewModifier {
             .onScrollPhaseChange { old, new in scrolling.phaseChanged(from: old.isScrolling, to: new.isScrolling) }
             .overlayPreferenceValue(FigureAnchorsKey.self) { items in
                 if isEnabled, PeekingFigureMetrics.isShown(dynamicTypeSize: dynamicTypeSize) {
-                    let character = characterOverride ?? HumanRig.character()
+                    let character = characterOverride ?? HumanRig.standard
                     let metrics = PeekingFigureMetrics(height: height, geometry: character.geometry)
                     GeometryReader { proxy in
                         let origin = proxy.frame(in: .global).origin

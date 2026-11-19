@@ -3,6 +3,10 @@ import SwiftUI
 /// The human figure on the stage: the rig (`FigureTimeline`,
 /// `FigureEdgePoses`, `FigureRepertoire`) behind the type-erased character.
 enum HumanRig {
+    /// The default `HumanFigure`, built once: the stage reads it on every
+    /// body evaluation (every scroll frame).
+    static let standard = character()
+
     /// `figure` on the stage.
     static func character(_ figure: HumanFigure = HumanFigure()) -> AnyFigureCharacter {
         AnyFigureCharacter(
@@ -86,11 +90,19 @@ enum HumanDrawing {
             Path { $0.addLines(points) }
         }
 
-        // One layer, so the far arm and leg fade as a whole where they cross.
-        context.drawLayer { far in
-            far.opacity = skeleton.farLimbOpacity
+        func drawFar(_ far: inout GraphicsContext) {
             far.stroke(polyline(skeleton.legL), with: shading(figure.legColor), style: limb)
             far.stroke(polyline(skeleton.armL), with: shading(figure.armColor), style: limb)
+        }
+        if skeleton.farLimbOpacity < 1 {
+            // One layer, so the far arm and leg fade as a whole where they cross.
+            context.drawLayer { far in
+                far.opacity = skeleton.farLimbOpacity
+                drawFar(&far)
+            }
+        } else {
+            // Opaque (facing front): the same pixels without an offscreen layer.
+            drawFar(&context)
         }
         context.stroke(polyline(skeleton.legR), with: shading(figure.legColor), style: limb)
         context.stroke(

@@ -21,7 +21,7 @@ struct PeekingFigureView: View {
     var loops = false
     var color: Color
     /// Who plays: poses, actions, boxes and drawing (the human rig by default).
-    var character = HumanRig.character()
+    var character = HumanRig.standard
     /// Sizes at the stage's figure height.
     var metrics = PeekingFigureMetrics.standard
     /// Idle motion allowed (foreground, not Low Power) — gates the loop.

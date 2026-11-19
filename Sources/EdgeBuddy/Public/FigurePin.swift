@@ -206,7 +206,7 @@ struct FigurePinnedPlay: Equatable {
     /// nil = fall back to the free stage.
     static func resolve(
         _ pin: FigurePin, anchors: [FigureAnchorFrame], viewport stage: CGRect?,
-        metrics: PeekingFigureMetrics, style: FigureStyle, character: AnyFigureCharacter = HumanRig.character()
+        metrics: PeekingFigureMetrics, style: FigureStyle, character: AnyFigureCharacter = HumanRig.standard
     ) -> FigurePinnedPlay? {
         let edge = pin.figureEdge
         guard character.geometry.supportedEdges.contains(edge.member),

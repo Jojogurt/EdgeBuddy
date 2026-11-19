@@ -38,8 +38,8 @@ struct FigureGeometry: Equatable, Sendable {
 }
 
 /// A character with its pose type erased, as the stage keeps it: closures
-/// over the concrete character. Built once per body evaluation of the stage;
-/// per frame only `frame(_:at:edge:heading:)` runs (one pose, one drawing
+/// over the concrete character. The default human is built once
+/// (`HumanRig.standard`); per frame only `frame(_:at:edge:heading:)` runs (one pose, one drawing
 /// closure).
 struct AnyFigureCharacter: Sendable {
     /// The character's type: another type starts the stage over (a play of
