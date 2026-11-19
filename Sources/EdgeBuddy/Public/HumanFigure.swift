@@ -105,8 +105,9 @@ public struct HumanFigure: FigureCharacter {
     }
 
     /// The repertoire at `edge`, each action as one whole play from the rest
-    /// pose back to it (the stage itself plays the rig, with its random
-    /// repeat counts, routes and grips).
+    /// pose back to it; at a side, where it has no rest, from the action's
+    /// own held pose back to it (the stage itself plays the rig, with its
+    /// random repeat counts, routes and grips).
     public func actions(at edge: FigureEdge) -> [FigureCharacterAction<Pose>] {
         FigureRepertoire.actions(for: edge).map { action in
             let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: edge)
@@ -120,6 +121,9 @@ public struct HumanFigure: FigureCharacter {
         }
     }
 
+    /// Standing on the top, hanging under the bottom. A side has no rest out
+    /// from behind the card (the figure only shows there while it flags or
+    /// climbs): there it is the hidden pose.
     public func restPose(at edge: FigureEdge) -> Pose {
         Pose(FigureTimeline.restPose(edge))
     }
@@ -129,7 +133,8 @@ public struct HumanFigure: FigureCharacter {
     }
 
     /// The spring entrance at `edge` (`FigureStyle.entrance` picks the
-    /// top's entrance on the stage).
+    /// top's entrance on the stage). A side has none (no motion): its
+    /// actions come out their own way, hands first.
     public func entrance(at edge: FigureEdge) -> FigureMotion<Pose>? {
         let timeline = FigureTimeline(
             action: .rest, entrance: .spring, reduceMotion: false, edge: edge, variation: FigureVariation(repeats: 0)

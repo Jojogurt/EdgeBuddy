@@ -125,9 +125,11 @@ struct FigureVariation: Equatable, Sendable {
     }
 
     /// This cycle as one action of a run (`FigureStyle.actionsPerCycle`):
-    /// while the run `continues` it ends standing — no exit, so no
-    /// `holdAfter` and no hidden pause; the next action's `holdBefore` is
-    /// the pause between them.
+    /// while the run `continues` it ends out — no exit, so no `holdAfter`
+    /// and no hidden pause; the next action's `holdBefore` is the pause
+    /// between them. On the top and the bottom it ends standing (hanging);
+    /// at a side in the action's held pose, from where the next action
+    /// leaves its own way to come out elsewhere (`FigureChain.Step.relocate`).
     func chained(continues: Bool) -> FigureVariation {
         guard continues else { return self }
         var variation = self
@@ -139,6 +141,8 @@ struct FigureVariation: Equatable, Sendable {
 
     /// Going back behind the card at once (a run cut short by a scroll):
     /// the rest pose once, no holds, out with `exit`, then hidden a while.
+    /// At a side (no rest there) straight back the way of the action it is
+    /// in, from the pose shown.
     static func leaving(exit: FigureEntrance, using generator: inout some RandomNumberGenerator) -> FigureVariation {
         FigureVariation(
             repeats: 1, exit: exit, hiddenPause: .random(in: hiddenPauseRange, using: &generator)
@@ -151,17 +155,26 @@ enum FigureChain {
     enum Step: Equatable {
         /// The next action of the run, from where it stands.
         case next
-        /// Back behind the card now (the run is over or a scroll cut it).
+        /// The next action of the run, elsewhere: back behind the card the
+        /// way of the action it is in, then straight out at another edge or
+        /// anchor (like a tap) — where it cannot stand (a side).
+        case relocate
+        /// Back behind the card now (the run is over or a scroll cut it; or
+        /// it would stand where it cannot: it then waits hidden).
         case leave
         /// Stays standing (a celebration holds the stage, or idle motion is off).
         case stand
     }
 
-    /// After an action that ended standing because the run went on, with
-    /// `left` actions still owed.
-    static func afterAction(left: Int, isScrolling: Bool, canLoop: Bool, isWaiting: Bool) -> Step {
-        if isWaiting || !canLoop { return .stand }
-        return left > 0 && !isScrolling ? .next : .leave
+    /// After an action that ended out because the run went on, with `left`
+    /// actions still owed. `canStand` false: where it is the character has
+    /// no rest (the human at a side), so it never stands or goes on there.
+    static func afterAction(
+        left: Int, isScrolling: Bool, canLoop: Bool, isWaiting: Bool, canStand: Bool = true
+    ) -> Step {
+        if isWaiting || !canLoop { return canStand ? .stand : .leave }
+        guard left > 0, !isScrolling else { return .leave }
+        return canStand ? .next : .relocate
     }
 }
 
@@ -445,20 +458,16 @@ enum FigureEdgePoses {
     /// Where the drawn side box starts: the gripping hands' caps show, the
     /// rest of the card hides the figure.
     static let sideMaskX = sideGripX - Double(FigureSkeleton.limbWidth) / 2
-    /// Where the peek's hand holds the edge.
-    static let peekGrip = CGPoint(x: sideGripX, y: 52)
 
-    /// Beside the card, outside its side edge: the near hand on the edge,
-    /// elbow down, the other on the hip, leaning out a little, head turned
-    /// to the card — the side's rest.
-    static let peek = rest.with {
+    /// Fully behind the card, left of its side edge (and of `sideMaskX`):
+    /// standing, one hand down by the edge, the other on the hip. A side has
+    /// no rest out from behind the card — the figure only shows there while
+    /// it flags or climbs (`route(for:)`) — so this is also its rest pose
+    /// (`FigureTimeline.restPose`).
+    static let sideHidden = rest.with {
         $0.armL = -60; $0.elbowL = -60; $0.legL = -4; $0.legR = 6
-        $0.lean = 6; $0.x = 66; $0.tilt = -8
-    }.placing(armL: peekGrip)
-    /// The side's nod.
-    static let peekTilt = peek.with { $0.tilt = 6 }
-    /// Fully behind the card, left of its side edge (and of `sideMaskX`).
-    static let sideHidden = peek.with { $0.x = 14 }
+        $0.lean = 6; $0.x = 14; $0.tilt = -8
+    }
 
     /// Where the flag holds the edge: the upper hand high on a straight arm
     /// (pulling), the lower one well down on it (pushing).
@@ -475,8 +484,8 @@ enum FigureEdgePoses {
     /// card near the screen's edge it is cut there.
     static let flagA = flagBody.placing(armL: flagGripBottom, armR: flagGripTop)
     static let flagB = flagBody.with { $0.legL = 80; $0.legR = 100 }.placing(armL: flagGripBottom, armR: flagGripTop)
-    /// Half-way from the peek into the flag: hands already on the flag's
-    /// grips, body tilted 45°, knees bent.
+    /// Half-way out into the flag (`flagEntranceSteps`): hands already on
+    /// the flag's grips, body tilted 45°, knees bent.
     static let flagSwing = rest.with {
         $0.armL = -100; $0.elbowL = -1; $0.armR = -200; $0.elbowR = 1
         $0.legL = 40; $0.kneeL = -20; $0.legR = 20; $0.kneeR = -10
@@ -509,8 +518,9 @@ enum FigureEdgePoses {
         armL: CGPoint(x: sideGripX, y: climbHandTop), armR: CGPoint(x: sideGripX, y: climbHandTop + climbReach),
         legL: CGPoint(x: climbFootX, y: climbFootBottom), legR: CGPoint(x: climbFootX, y: climbFootBottom - climbReach)
     )
-    /// How a side action that has its own way in and out (the climb, the
-    /// flag) comes out from behind the card and goes back.
+    /// How a side action (the climb, the flag) comes out from behind the
+    /// card and goes back. Every side action has one: the figure never
+    /// stands at a side, it only shows there through a route.
     struct Route: Sendable {
         /// Behind the card, ready to reach around the edge.
         let hidden: FigureJoints
@@ -522,7 +532,8 @@ enum FigureEdgePoses {
         let held: FigureJoints
     }
 
-    /// The route of `action` at a side; nil = it comes out through the peek.
+    /// The route of `action` at a side; nil = it is not a side action (and
+    /// is not played at a side).
     static func route(for action: FigureAction) -> Route? {
         switch action {
         case .climb: climbRoute
@@ -589,19 +600,6 @@ enum FigureEdgePoses {
     /// The entrance backwards, from `climbA`: the body swings back in
     /// behind the card, then the hands let go, the upper one first.
     static let climbExitSteps: [FigureTimeline.Step] = FigureTimeline.reversed(climbEntranceSteps, from: climbHidden)
-    /// From the peek to `climbA` without squashing the figure flat: the
-    /// same peek seen the other way round (`flippedFacing`, an invisible
-    /// switch), then a turn into profile; the edge hand slides up the edge
-    /// to the high grip.
-    static let climbTurnIn: [FigureTimeline.Step] = [
-        .init(duration: 0, joints: peek.flippedFacing),
-        .init(duration: 0.42, joints: climbA, limbs: LimbPaths(armR: .held)),
-    ]
-    /// Back from `climbA` to the peek, the same way.
-    static let climbTurnOut: [FigureTimeline.Step] = [
-        .init(duration: 0.42, joints: peek.flippedFacing, limbs: LimbPaths(armR: .held)),
-        .init(duration: 0, joints: peek),
-    ]
 
     /// From `climbA` to `climbB`: the high hand and foot hold on (sliding
     /// down the grid as the figure rises), the low ones reach up, off the edge.
@@ -817,10 +815,19 @@ struct FigureTimeline: Equatable, Sendable {
     ///   - previousPose: the pose it ducks from when relocating (default the
     ///     previous edge's rest); mid-climb or mid-flag at a side it leaves
     ///     the way that action does (`FigureEdgePoses.route(leaving:)`).
+    ///     At a side without an action (`.rest`), the pose it is in: it
+    ///     leaves from there its own way (a run cut short).
     ///   - tempo: playback speed (`FigureStyle.tempo`); every time scales by 1/tempo.
     ///   - variation: holds, repeat count and exit of a looped cycle.
+    ///
+    /// A side plays only the flag and the climb, and only through their
+    /// route (`FigureEdgePoses.Route`): out its own way (or, with no
+    /// entrance, already in the action's held pose), and back its own way
+    /// (or, with no exit, ending in the held pose). Any other action at a
+    /// side, and a side action at another edge, is `.rest`; a side's rest
+    /// stays behind the card (`restPose`), so the figure never stands there.
     init(
-        action: FigureAction, entrance: FigureEntrance?, reduceMotion: Bool, edge: FigureEdge = .top,
+        action requested: FigureAction, entrance: FigureEntrance?, reduceMotion: Bool, edge: FigureEdge = .top,
         relocating: Bool = false, from previousEdge: FigureEdge? = nil, pose previousPose: FigureJoints? = nil,
         tempo: Double = 1, variation: FigureVariation = .standard
     ) {
@@ -839,6 +846,9 @@ struct FigureTimeline: Equatable, Sendable {
         }
         let rest = Self.restPose(edge)
         let poses = FigureEdgePoses.self
+        // The flag and the climb play only at a side, and only they do.
+        let route = edge.isSide ? poses.route(for: requested) : nil
+        let action = edge.isSide == (poses.route(for: requested) != nil) ? requested : .rest
         let repeats = variation.repeats ?? Self.canvasRepeats(action)
         var walk: ClosedRange<Double>?
         var signature: Double?
@@ -858,12 +868,21 @@ struct FigureTimeline: Equatable, Sendable {
         }
 
         let comesOut = relocating ? (entrance ?? .spring) : entrance
-        // The side climb and flag come out and go back their own way, hands
-        // first, straight into (and out of) the action — no peek, no turn.
-        let route = edge.isSide ? poses.route(for: action) : nil
-        let entersOwnWay = route != nil && comesOut != nil
-        let leavesOwnWay = route != nil && variation.exit != nil
-        let hidden = comesOut.map { route?.hidden ?? Self.hiddenPose($0, edge: edge) } ?? rest
+        // The pose the action starts in once out and ends in before going
+        // back: the edge's rest, or at a side the action's own held pose
+        // (the side climb and flag come out and go back their own way,
+        // hands first, straight into and out of the action). At a side
+        // without an action: mid-flag or mid-climb where it already is (a
+        // run cut short leaves from there), else behind the card.
+        let stance: FigureJoints = if let route {
+            route.held
+        } else if edge.isSide, !relocating, comesOut == nil,
+                  let pose = previousPose, poses.route(leaving: pose) != nil {
+            pose
+        } else {
+            rest
+        }
+        let hidden = comesOut.map { route?.hidden ?? Self.hiddenPose($0, edge: edge) } ?? stance
         func hold(_ seconds: Double, _ pose: FigureJoints) {
             guard seconds > 0 else { return }
             time += seconds
@@ -889,22 +908,19 @@ struct FigureTimeline: Equatable, Sendable {
             frames.append(Keyframe(time: 0, joints: hidden, easing: .inOut))
             relocatesAt = nil
         }
-        if let comesOut { play(route.map { entersOwnWay ? $0.entrance : [] } ?? Self.entranceSteps(comesOut, edge: edge)) }
-        hold(variation.holdBefore, entersOwnWay ? route?.held ?? rest : rest)
+        if let comesOut { play(route?.entrance ?? Self.entranceSteps(comesOut, edge: edge)) }
+        hold(variation.holdBefore, stance)
 
         switch action {
         case .rest:
-            for _ in 0..<repeats {
-                switch edge {
-                case .top:
-                    at(0.2, rest.with { $0.tilt = 9 })
-                    at(0.28, rest)
-                case .bottom:
+            // A nod; a side has no rest out from behind the card, nothing to play.
+            for _ in 0..<(edge.isSide ? 0 : repeats) {
+                if edge == .bottom {
                     at(0.2, poses.hangSag, limbs: poses.hangGrips)
                     at(0.28, rest, limbs: poses.hangGrips)
-                case .leading, .trailing:
-                    at(0.24, poses.peekTilt, limbs: Self.peekGrip)
-                    at(0.3, rest, limbs: Self.peekGrip)
+                } else {
+                    at(0.2, rest.with { $0.tilt = 9 })
+                    at(0.28, rest)
                 }
             }
             signature = time
@@ -925,32 +941,18 @@ struct FigureTimeline: Equatable, Sendable {
                 at(0.42, rest, limbs: poses.hangGrips)
             }
         case .flag:
-            if !entersOwnWay {
-                // From the peek: the near hand slides down the edge to its
-                // grip, the other reaches up to the upper one; both hold
-                // while the body swings out flat.
-                at(0.4, poses.flagSwing, limbs: .hands)
-                at(0.35, poses.flagA, limbs: .hands)
-            }
+            // Held out flat from `flagA` on, legs scissoring.
             signature = time
             for _ in 0..<repeats {
                 at(0.22, poses.flagB, limbs: .hands)
                 at(0.22, poses.flagA, limbs: .hands)
             }
-            if !leavesOwnWay {
-                at(0.35, poses.flagSwing, limbs: .hands)
-                at(0.42, rest, limbs: .hands)
-            }
         case .climb:
-            // Out already (the climb's own entrance), or turn from the peek
-            // to the card; climb hand over hand (each half-cycle rises one
-            // reach); leave the climb's own way (the exit), or turn back.
-            if !entersOwnWay { play(poses.climbTurnIn) }
+            // From `climbA`, hand over hand: each half-cycle rises one reach.
             for _ in 0..<repeats {
                 at(0.36, poses.climbB, limbs: poses.climbFromA, travel: poses.climbReach)
                 at(0.36, poses.climbA, limbs: poses.climbFromB, travel: poses.climbReach)
             }
-            if !leavesOwnWay { play(poses.climbTurnOut) }
         case .wave:
             let up = rest.with {
                 $0.armL = -8; $0.elbowL = 4; $0.armR = 148; $0.elbowR = -18; $0.tilt = -7
@@ -1071,8 +1073,9 @@ struct FigureTimeline: Equatable, Sendable {
             at(0.3, rest)
         }
         if let exit = variation.exit {
-            hold(variation.holdAfter, leavesOwnWay ? route?.held ?? rest : rest)
-            play(leavesOwnWay ? route?.exit ?? [] : Self.exitSteps(exit, edge: edge))
+            hold(variation.holdAfter, stance)
+            // A side goes back the way of the action it is in (none = already hidden).
+            play(edge.isSide ? (route ?? poses.route(leaving: stance))?.exit ?? [] : Self.exitSteps(exit, edge: edge))
             hiddenPause = variation.hiddenPause
         } else {
             hiddenPause = nil
@@ -1090,9 +1093,6 @@ struct FigureTimeline: Equatable, Sendable {
         walkWindow = walk
         holdTime = signature
     }
-
-    /// The peek's hand on the card's edge holds on (`FigureEdgePoses.peek`).
-    private static let peekGrip = LimbPaths(armL: .held)
 
     /// Repetitions of an action's beat at the canvas count (`FigureVariation.repeats` nil).
     static func canvasRepeats(_ action: FigureAction) -> Int {
@@ -1124,7 +1124,8 @@ struct FigureTimeline: Equatable, Sendable {
     /// The steps from `hiddenPose(entrance, edge:)` up to the edge's rest.
     /// Only the top uses `entrance`: the bottom lowers itself from behind the
     /// card on bent arms (hands sliding down the grip line) and straightens
-    /// into the hang; a side slides out from behind the card's edge.
+    /// into the hang. A side has none: it has no rest out from behind the
+    /// card, its actions come out their own way (`FigureEdgePoses.Route`).
     static func entranceSteps(_ entrance: FigureEntrance, edge: FigureEdge = .top) -> [Step] {
         let poses = FigureEdgePoses.self
         switch edge {
@@ -1136,7 +1137,7 @@ struct FigureTimeline: Equatable, Sendable {
                 Step(duration: 0.18, joints: poses.hang, limbs: poses.hangGrips),
             ]
         case .leading, .trailing:
-            return [Step(duration: 0.42, joints: poses.peek, easing: .out), Step(duration: 0.14, joints: poses.peek)]
+            return []
         case .top:
             break
         }
@@ -1168,12 +1169,15 @@ struct FigureTimeline: Equatable, Sendable {
     }
 
     /// The pose an edge's actions start and end in: standing with hands on
-    /// hips (top), hanging (bottom), peeking from behind the edge (sides).
+    /// hips (top), hanging (bottom). A side has no rest out from behind the
+    /// card: its actions start and end in their own held pose
+    /// (`FigureEdgePoses.Route`), so its rest is the hidden pose — the stage
+    /// never plays a rest at a side.
     static func restPose(_ edge: FigureEdge) -> FigureJoints {
         switch edge {
         case .top: .rest
         case .bottom: FigureEdgePoses.hang
-        case .leading, .trailing: FigureEdgePoses.peek
+        case .leading, .trailing: FigureEdgePoses.sideHidden
         }
     }
 
@@ -1663,6 +1667,39 @@ enum FigureAnchorPicker {
         let edges = FigureEdge.allCases.filter { edge in pool.contains { $0.edge == edge } }
         guard let edge = weightedEdge(edges, using: &generator) else { return nil }
         return pool.filter { $0.edge == edge }.randomElement(using: &generator).map { (id: $0.id, edge: $0.edge) }
+    }
+
+    /// The edges among `allowed` a play without an action (the rest) may
+    /// use: all of them for a character that rests at every edge; else (the
+    /// human, who has no rest at a side) never a side, and only the top
+    /// when it is allowed.
+    static func restingEdges(allowed: FigureEdges, restsAtSides: Bool) -> FigureEdges {
+        guard !restsAtSides else { return allowed }
+        let edges = allowed.subtracting([.leading, .trailing])
+        return edges.contains(.top) ? .top : edges
+    }
+
+    /// Where a play without an action goes, among `allowed` (its
+    /// `restingEdges`): an edge of `current` when one fits there, in the
+    /// order top, bottom; else another placement (`nextPlacement`); nil
+    /// when none fits.
+    static func restingPlacement<ID: Hashable>(
+        current: ID?, candidates: [(id: ID, rect: CGRect, edges: FigureEdges)], viewport: CGRect?,
+        viewportFor: ((ID) -> CGRect?)? = nil, sizes: FigureSizes, allowed: FigureEdges,
+        using generator: inout some RandomNumberGenerator
+    ) -> (id: ID, edge: FigureEdge)? {
+        if let current, let candidate = candidates.first(where: { $0.id == current }) {
+            let visible = viewportFor?(current) ?? viewport
+            let edge = FigureEdge.allCases.first {
+                candidate.edges.intersection(allowed).contains($0.member)
+                    && isEligible(rect: candidate.rect, edge: $0, viewport: visible, sizes: sizes)
+            }
+            if let edge { return (id: current, edge: edge) }
+        }
+        return nextPlacement(
+            current: current, candidates: candidates, viewport: viewport, viewportFor: viewportFor,
+            sizes: sizes, allowed: allowed, using: &generator
+        )
     }
 
     /// One of `edges`, drawn by `FigureEdge.weight` (renormalized).

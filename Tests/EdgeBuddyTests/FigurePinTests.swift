@@ -30,7 +30,8 @@ struct FigurePinTests {
         ("week", .bottom, .bottom),
     ])
     func chosenAnchorAndEdge(anchor: String, edges: FigureEdges, expected: FigureEdge) throws {
-        let pin = FigurePin(anchor: anchor, edge: edges, pose: .rest)
+        // A side only plays the flag (a rest pinned there goes to the top).
+        let pin = FigurePin(anchor: anchor, edge: edges, pose: expected.isSide ? .flag : .rest)
         let first = try #require(resolve(pin))
         #expect(first.anchor == AnyHashable(anchor))
         #expect(first.edge == expected)
@@ -46,6 +47,43 @@ struct FigurePinTests {
         let play = try #require(resolve(FigurePin(anchor: "stats", edge: .trailing, pose: .flag)))
         #expect(play.edge == .trailing)
         #expect(play.action == FigureAction.flag.name)
+    }
+
+    @Test("A rest or a top pose pinned at a side plays on the top of that anchor", arguments: [
+        (FigurePose.rest, FigureEdges.trailing), (.rest, .leading), (.wave, .trailing), (.handstand, .leading),
+    ])
+    func sidePinGoesToTheTop(pose: FigurePose, edge: FigureEdges) throws {
+        #expect(!pose.edges.contains(.leading) && !pose.edges.contains(.trailing))
+        let play = try #require(resolve(FigurePin(anchor: "hero", edge: edge, pose: pose)))
+        #expect(play.anchor == AnyHashable("hero"))
+        #expect(play.edge == .top)
+        #expect(play.action == pose.name)
+        // The same as pinning it on the top.
+        let top = try #require(resolve(FigurePin(anchor: "hero", edge: .top, pose: pose)))
+        #expect(play.action == top.action && play.holdTime == top.holdTime && play.spot == top.spot)
+        // Even on an anchor that only allows its sides (a pin ignores them).
+        let sides = [FigureAnchorFrame(id: AnyHashable("hero"), edges: [.leading, .trailing], rect: anchors[0].rect)]
+        #expect(try #require(resolve(FigurePin(anchor: "hero", edge: edge, pose: pose), anchors: sides)).edge == .top)
+        // The flag stays at the side.
+        let flag = FigurePin(anchor: "hero", edge: edge, pose: .flag)
+        #expect(try #require(resolve(flag)).edge == flag.figureEdge)
+    }
+
+    @Test("A side pin moved to the top falls back when the top doesn't fit")
+    func sidePinTopDoesNotFit() throws {
+        // The card's top is too close to the viewport's top for the figure; its sides fit.
+        let high = [FigureAnchorFrame(id: AnyHashable("hero"), edges: .all, rect: CGRect(x: 40, y: 10, width: 320, height: 200))]
+        #expect(resolve(FigurePin(anchor: "hero", edge: .top, pose: .rest), anchors: high) == nil)
+        #expect(resolve(FigurePin(anchor: "hero", edge: .trailing, pose: .rest), anchors: high) == nil)
+        #expect(resolve(FigurePin(anchor: "hero", edge: .trailing, pose: .wave), anchors: high) == nil)
+        #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .trailing, pose: .flag), anchors: high)).edge == .trailing)
+    }
+
+    @Test("FigurePose.rest is no side pose: top and bottom only")
+    func restEdges() {
+        #expect(FigurePose.rest.edges == [.top, .bottom])
+        #expect(FigurePose.allCases.filter { $0.edges.contains(.trailing) } == [.flag])
+        #expect(FigurePose.allCases.filter { $0.edges.contains(.leading) } == [.flag])
     }
 
     @Test("Several edges: the first of top, bottom, leading, trailing; none = top")
@@ -87,11 +125,13 @@ struct FigurePinTests {
         #expect(try #require(resolve(FigurePin(anchor: "hero", pose: .wave, spot: -1))).spot == 0)
     }
 
-    @Test("A pose of another edge rests there")
+    @Test("A pose of another edge rests there; at a side it plays on the anchor's top")
     func poseOfAnotherEdge() throws {
         #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .bottom, pose: .wave))).action == FigureAction.rest.name)
         #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .top, pose: .flag))).action == FigureAction.rest.name)
-        #expect(try #require(resolve(FigurePin(anchor: "hero", edge: .leading, pose: .pullUp))).action == FigureAction.rest.name)
+        // A bottom pose pinned at a side: on the top, where it rests.
+        let pullUp = try #require(resolve(FigurePin(anchor: "hero", edge: .leading, pose: .pullUp)))
+        #expect(pullUp.edge == .top && pullUp.action == FigureAction.rest.name)
         for pose in FigurePose.allCases {
             for edge in FigureEdge.allCases where pose.edges.contains(edge.member) {
                 if pose != .rest { #expect(pose.action(at: edge) != .rest) }
@@ -107,7 +147,9 @@ struct FigurePinTests {
         (.flag, .leading, FigureEdgePoses.flagA),
         (.rest, .top, FigureJoints.rest),
         (.rest, .bottom, FigureEdgePoses.hang),
-        (.rest, .trailing, FigureEdgePoses.peek),
+        // No rest at a side: it stands on the anchor's top.
+        (.rest, .trailing, FigureJoints.rest),
+        (.rest, .leading, FigureJoints.rest),
     ])
     func holdFrame(pose: FigurePose, edge: FigureEdges, expected: FigureJoints) throws {
         for animated in [true, false] {

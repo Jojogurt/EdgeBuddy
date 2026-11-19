@@ -438,7 +438,7 @@ struct PeekingFigureTests {
 
     private static let edgeActions: [(FigureAction, FigureEdge)] = [
         (.rest, .bottom), (.swing, .bottom), (.pullUp, .bottom),
-        (.rest, .trailing), (.flag, .trailing), (.climb, .trailing), (.rest, .leading),
+        (.flag, .trailing), (.climb, .trailing), (.flag, .leading), (.climb, .leading),
     ]
 
     private func points(_ joints: FigureJoints) -> [CGPoint] {
@@ -450,27 +450,32 @@ struct PeekingFigureTests {
         hypot(a.x - b.x, a.y - b.y)
     }
 
-    @Test("Edge actions start and end in their edge's rest", arguments: edgeActions)
-    func edgeActionsRest(action: FigureAction, edge: FigureEdge) {
+    @Test("Edge actions start and end in their edge's rest; at a side in the action's own held pose",
+          arguments: edgeActions)
+    func edgeActionsRest(action: FigureAction, edge: FigureEdge) throws {
         let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: edge)
-        let rest = FigureTimeline.restPose(edge)
+        let rest = edge.isSide
+            ? try #require(FigureEdgePoses.route(for: action)).held : FigureTimeline.restPose(edge)
         #expect(timeline.keyframes.first?.joints == rest)
         #expect(timeline.final == rest)
         #expect(timeline.duration > 0.4)
     }
 
-    @Test("Edge entrance comes out from hidden, the exit goes back", arguments: [FigureEdge.bottom, .trailing])
-    func edgeEntranceAndExit(edge: FigureEdge) {
+    @Test("Edge entrance comes out from hidden, the exit goes back", arguments: [
+        (FigureAction.rest, FigureEdge.bottom), (.flag, .trailing), (.climb, .leading),
+    ])
+    func edgeEntranceAndExit(action: FigureAction, edge: FigureEdge) {
         var variation = FigureVariation.standard
         variation.exit = .climb
         variation.hiddenPause = 1
         let timeline = FigureTimeline(
-            action: .rest, entrance: .climb, reduceMotion: false, edge: edge, variation: variation
+            action: action, entrance: .climb, reduceMotion: false, edge: edge, variation: variation
         )
-        let hidden = FigureTimeline.hiddenPose(.climb, edge: edge)
+        let route = edge.isSide ? FigureEdgePoses.route(for: action) : nil
+        let hidden = route?.hidden ?? FigureTimeline.hiddenPose(.climb, edge: edge)
         #expect(timeline.keyframes.first?.joints == hidden)
         #expect(timeline.final == hidden)
-        #expect(timeline.keyframes.contains { $0.joints == FigureTimeline.restPose(edge) })
+        #expect(timeline.keyframes.contains { $0.joints == route?.held ?? FigureTimeline.restPose(edge) })
     }
 
     @Test("Hidden edge poses stay entirely behind the card")
@@ -499,7 +504,7 @@ struct PeekingFigureTests {
         }
     }
 
-    @Test("Flag holds the side edge with both hands, body outside the card; peek with one, beside the card")
+    @Test("Flag holds the side edge with both hands, body outside the card; the side's rest is behind it")
     func sideGrips() {
         for pose in [FigureEdgePoses.flagA, FigureEdgePoses.flagB] {
             let s = FigureSkeleton(pose)
@@ -511,9 +516,10 @@ struct PeekingFigureTests {
             // Body flat: torso horizontal.
             #expect(abs(s.hip.y - s.torsoTop.y) < 0.5)
         }
-        let peek = FigureSkeleton(FigureEdgePoses.peek)
-        #expect(distance(peek.armL[2], FigureEdgePoses.peekGrip) < 1e-6)
-        #expect(peek.head.x - FigureSkeleton.headRadius > FigureEdgePoses.sideEdgeX)
+        // No rest out beside the card: the side's rest is the hidden pose.
+        #expect(FigureTimeline.restPose(.trailing) == FigureEdgePoses.sideHidden)
+        #expect(FigureTimeline.restPose(.leading) == FigureEdgePoses.sideHidden)
+        #expect(!HumanRig.isOut(FigureEdgePoses.sideHidden, at: .trailing))
         // Climb: the hip outside the card, facing it.
         #expect(FigureSkeleton(FigureEdgePoses.climbA).hip.x > FigureEdgePoses.sideEdgeX)
         #expect(FigureEdgePoses.climbA.facing == -1)
@@ -767,10 +773,15 @@ struct PeekingFigureTests {
         #expect(top.armL[1].x < top.armL[0].x && top.armR[1].x > top.armR[0].x)
     }
 
-    @Test("Side: held hands stay put through the rest and the flag")
+    @Test("Side: held hands stay put through the flag, held out and coming out")
     func sideGripsSampled() {
-        for action in [FigureAction.rest, .flag] {
-            let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: .trailing)
+        var variation = FigureVariation(repeats: 2)
+        variation.exit = .spring
+        for entrance in [nil, FigureEntrance.spring] {
+            let timeline = FigureTimeline(
+                action: .flag, entrance: entrance, reduceMotion: false, edge: .trailing,
+                variation: entrance == nil ? .standard : variation
+            )
             for time in samples(timeline) {
                 guard let (a, b) = segment(timeline, at: time), !b.limbs.isEmpty else { continue }
                 let s = FigureSkeleton(timeline.joints(at: time))
@@ -803,8 +814,8 @@ struct PeekingFigureTests {
             #expect(box.minY >= 0 && box.maxY <= PeekingFigureMetrics.sideBox.height)
             #expect(box.maxX <= 2 * PeekingFigureMetrics.sideBox.width)
         }
-        #expect(climb.keyframes.first?.joints == FigureEdgePoses.peek)
-        #expect(climb.final == FigureEdgePoses.peek)
+        #expect(climb.keyframes.first?.joints == FigureEdgePoses.climbA)
+        #expect(climb.final == FigureEdgePoses.climbA)
         // A held limb stays at one spot on the card: its grid y minus the
         // distance risen so far is constant over its segment.
         for time in samples(climb) {
@@ -821,7 +832,7 @@ struct PeekingFigureTests {
     }
 
     @Test("Side actions play outside the card: torso and head beside it, only the grips over the edge",
-          arguments: [FigureAction.rest, .flag, .climb])
+          arguments: [FigureAction.flag, .climb])
     func sideOutside(action: FigureAction) {
         let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: .trailing)
         for time in samples(timeline) {
@@ -838,15 +849,21 @@ struct PeekingFigureTests {
         }
     }
 
-    @Test("Side entrance slides out from behind the card's edge, the exit slides back")
+    @Test("A side's rest stays behind the card: no entrance of its own, nothing comes out")
     func sideEntrance() {
         var variation = FigureVariation.standard
         variation.exit = .spring
-        let timeline = FigureTimeline(
-            action: .rest, entrance: .spring, reduceMotion: false, edge: .trailing, variation: variation
-        )
-        #expect(extent(timeline.keyframes[0].joints).maxX < FigureEdgePoses.sideMaskX)
-        #expect(extent(timeline.final).maxX < FigureEdgePoses.sideMaskX)
+        for entrance in [nil, FigureEntrance.spring, .climb] {
+            let timeline = FigureTimeline(
+                action: .rest, entrance: entrance, reduceMotion: false, edge: .trailing, variation: variation
+            )
+            for keyframe in timeline.keyframes {
+                #expect(extent(keyframe.joints).maxX < FigureEdgePoses.sideMaskX)
+            }
+            #expect(timeline.final == FigureEdgePoses.sideHidden)
+        }
+        #expect(FigureTimeline.entranceSteps(.spring, edge: .trailing).isEmpty)
+        #expect(FigureTimeline.exitSteps(.climb, edge: .leading).isEmpty)
         #expect(FigureTimeline.duckPose(.trailing) == FigureEdgePoses.sideHidden)
     }
 
@@ -1088,7 +1105,7 @@ struct PeekingFigureTests {
 
     @Test("Flipped facing draws the same figure")
     func flippedFacing() {
-        for pose in [FigureEdgePoses.peek, FigureEdgePoses.peekTilt, FigureJoints.rest] {
+        for pose in [FigureEdgePoses.sideHidden, FigureEdgePoses.flagA, FigureEdgePoses.hang, FigureJoints.rest] {
             let a = FigureSkeleton(pose), b = FigureSkeleton(pose.flippedFacing)
             #expect(distance(a.head, b.head) < 1e-6 && distance(a.torsoTop, b.torsoTop) < 1e-6)
             for i in 0..<3 {
@@ -1109,10 +1126,10 @@ struct PeekingFigureTests {
         #expect(climb.final == FigureEdgePoses.climbHidden)
         #expect(extent(FigureEdgePoses.climbHidden).maxX < FigureEdgePoses.sideMaskX)
         #expect(FigureEdgePoses.climbHidden.profile == 1 && FigureEdgePoses.climbHidden.facing == -1)
-        // The entrance lands in `climbA`, never through the peek.
+        // The entrance lands in `climbA`, never standing beside the card.
         let entered = FigureEdgePoses.climbEntranceSteps.map(\.duration).reduce(0, +)
         #expect(climb.keyframes.contains { abs($0.time - entered) < 1e-9 && $0.joints == FigureEdgePoses.climbA })
-        #expect(!climb.keyframes.contains { $0.joints == FigureEdgePoses.peek })
+        expectNeverStandsAtSide(climb, edge: .trailing)
         // Hands: the low one grips first, then the high one.
         let low = FigureSkeleton(FigureEdgePoses.climbReachLow)
         #expect(distance(low.armL[2], FigureEdgePoses.climbGripLow) < 1e-6)
@@ -1134,20 +1151,16 @@ struct PeekingFigureTests {
         #expect(try #require(climb.walkDistance) > 0)
     }
 
-    @Test("Climb without entrance or exit turns from and back to the peek without squashing")
+    @Test("Climb without entrance or exit starts and ends in its held pose, no turn, never squashed")
     func climbTurns() {
         let climb = FigureTimeline(action: .climb, entrance: nil, reduceMotion: false, edge: .trailing)
-        #expect(climb.keyframes[0].joints == FigureEdgePoses.peek)
-        #expect(climb.final == FigureEdgePoses.peek)
+        #expect(climb.keyframes[0].joints == FigureEdgePoses.climbA)
+        #expect(climb.final == FigureEdgePoses.climbA)
         neverSquashed(climb)
-        // The turn's flipped peek is the peek, drawn the same.
-        #expect(distance(
-            FigureSkeleton(FigureEdgePoses.peek.flippedFacing).armR[2], FigureEdgePoses.peekGrip
-        ) < 1e-6)
-        // Coming out at the start, staying out at the end.
+        // Coming out at the start, staying out (in the held pose) at the end.
         let out = FigureTimeline(action: .climb, entrance: .climb, reduceMotion: false, edge: .trailing)
         #expect(out.keyframes[0].joints == FigureEdgePoses.climbHidden)
-        #expect(out.final == FigureEdgePoses.peek)
+        #expect(out.final == FigureEdgePoses.climbRoute.held)
         neverSquashed(out)
     }
 
@@ -1161,17 +1174,17 @@ struct PeekingFigureTests {
         #expect(timeline.joints(at: 0) == FigureEdgePoses.climbB)
         #expect(timeline.keyframes.contains { abs($0.time - jump) < 1e-9 && $0.joints == FigureEdgePoses.climbHidden })
         for time in samples(timeline) where time <= jump { #expect(abs(timeline.joints(at: time).facing) > 0.99) }
-        // Not climbing: the usual duck.
-        let peek = FigureTimeline(
+        // Not climbing (behind the card): the usual duck.
+        let hidden = FigureTimeline(
             action: .rest, entrance: .climb, reduceMotion: false, edge: .leading,
-            relocating: true, from: .trailing, pose: FigureEdgePoses.peek
+            relocating: true, from: .trailing, pose: FigureEdgePoses.sideHidden
         )
-        #expect(abs(try #require(peek.relocatesAt) - FigureTimeline.duckDuration) < 1e-9)
+        #expect(abs(try #require(hidden.relocatesAt) - FigureTimeline.duckDuration) < 1e-9)
     }
 
     // MARK: - Flag entrance and exit
 
-    @Test("Flag entrance: from behind the card, upper hand, lower hand, swing out flat — no peek, no turn")
+    @Test("Flag entrance: from behind the card, upper hand, lower hand, swing out flat — no standing, no turn")
     func flagEntrance() throws {
         var variation = FigureVariation(repeats: 2)
         variation.exit = .climb
@@ -1183,7 +1196,7 @@ struct PeekingFigureTests {
         #expect(extent(poses.flagHidden).maxX < poses.sideMaskX)
         let entered = poses.flagEntranceSteps.map(\.duration).reduce(0, +)
         #expect(flag.keyframes.contains { abs($0.time - entered) < 1e-9 && $0.joints == poses.flagA })
-        #expect(!flag.keyframes.contains { $0.joints == poses.peek })
+        expectNeverStandsAtSide(flag, edge: .trailing)
         // The upper hand grips first (the lower one still behind the card), then the lower.
         let high = FigureSkeleton(poses.flagReachHigh)
         #expect(distance(high.armR[2], poses.flagGripTop) < 1e-6)
@@ -1205,14 +1218,14 @@ struct PeekingFigureTests {
             }
         }
         neverSquashed(flag)
-        // Staying out: a smooth way back to the peek, still never squashed.
+        // Staying out: it ends held out in the flag, still never squashed.
         let stays = FigureTimeline(action: .flag, entrance: .climb, reduceMotion: false, edge: .trailing)
         #expect(stays.keyframes[0].joints == poses.flagHidden)
-        #expect(stays.final == poses.peek)
+        #expect(stays.final == poses.flagRoute.held)
         neverSquashed(stays)
     }
 
-    @Test("A tap mid-flag leaves around the edge, hidden at the jump; the peek still ducks")
+    @Test("A tap mid-flag leaves around the edge, hidden at the jump; a pose behind the card ducks")
     func flagRelocation() throws {
         let timeline = FigureTimeline(
             action: .wave, entrance: .spring, reduceMotion: false, edge: .top,
@@ -1222,7 +1235,8 @@ struct PeekingFigureTests {
         #expect(timeline.joints(at: 0) == FigureEdgePoses.flagB)
         #expect(timeline.keyframes.contains { abs($0.time - jump) < 1e-9 && $0.joints == FigureEdgePoses.flagHidden })
         #expect(FigureEdgePoses.route(leaving: FigureEdgePoses.flagSwing) != nil)
-        #expect(FigureEdgePoses.route(leaving: FigureEdgePoses.peekTilt) == nil)
+        #expect(FigureEdgePoses.route(leaving: FigureEdgePoses.sideHidden) == nil)
+        #expect(FigureEdgePoses.route(leaving: .rest) == nil)
     }
 }
 

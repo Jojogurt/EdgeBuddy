@@ -4,6 +4,34 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## Unreleased
+
+- Changed: the human figure no longer has a rest pose at a side. The pose leaning out from
+  behind the card's edge is gone from everything it can show. At a side it only does the flag
+  and the climb, always coming out hands first straight into the action and going back the
+  same way; it never stands or rests at a side.
+- Changed: in a run (`FigureStyle.actionsPerCycle`) a flag or a climb no longer ends standing
+  at the side. The figure goes back behind the card the action's own way and comes out right
+  away elsewhere (another edge or another card, picked like after a tap) with the next action
+  of the run, with no hidden pause; the run keeps its count. A scroll that cuts the run sends
+  it straight back from the flag or the climb. A climb to the top of a side by the screen's
+  edge no longer ends the run. Runs on the top and the bottom are unchanged.
+- Changed: whatever plays without an action never lands on a side: coming out while
+  `isWaiting`, Low Power Mode's rest, Reduce Motion's rest and an edge with nothing to play
+  use a card's top (the same card's when it fits, else another one; it waits hidden when no
+  top fits). A celebration or idle motion turned off right after a flag or a climb of a run
+  sends the figure back behind the card, and it comes out again afterwards.
+- Changed: `FigurePose.rest` is played at the top and the bottom only (`edges` was `.all`). A
+  pin at a side with any pose other than `.flag`, `.rest` included, now plays that pose on the
+  top of the same anchor; if the top doesn't fit, the stage plays as without a pin, as for any
+  pin that doesn't fit. Pins at the top and the bottom are unchanged.
+- `HumanFigure.restPose(at:)` at a side now returns the hidden pose, and `entrance(at:)` at a
+  side is empty: the side's actions come out their own way.
+- Custom characters (`FigureCharacter`) keep their rest pose at every edge, the sides
+  included, and behave as before.
+- Demo: the Pinning tab offers only the poses played at the chosen edge (at a side only the
+  flag); Playground's text describes the sides.
+
 ## 0.4.1 - 2026-11-19
 
 - Performance: the far arm and leg are drawn through an offscreen layer only while they fade

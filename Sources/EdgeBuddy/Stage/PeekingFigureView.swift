@@ -258,15 +258,22 @@ struct PeekingFigureView: View {
         case .playEnded(let id):
             guard id == playID else { return }
             if isChained {
-                // One action of a run ended standing: the next one, or leave.
+                // One action of a run ended out: the next one, or leave.
                 isChained = false
                 switch FigureChain.afterAction(
-                    left: chainLeft, isScrolling: isScrolling, canLoop: canLoop, isWaiting: isWaiting
+                    left: chainLeft, isScrolling: isScrolling, canLoop: canLoop, isWaiting: isWaiting,
+                    canStand: canStand(at: edge)
                 ) {
                 case .next:
                     chainLeft -= 1
                     play(entrance: nil, chainStep: true)
+                case .relocate:
+                    // No standing at a side: back the action's own way, out elsewhere.
+                    chainLeft -= 1
+                    play(entrance: style.entrance, relocating: true, chainStep: true)
                 case .leave:
+                    // Also instead of standing at a side: it waits hidden
+                    // (`isPending`) or comes out again after the pause.
                     chainLeft = 0
                     play(entrance: nil, action: FigureActionName.rest, leaving: true)
                 case .stand:
@@ -418,16 +425,41 @@ struct PeekingFigureView: View {
         return supported.contains(.top) ? .top : supported
     }
 
+    /// Edges a play without an action (the rest) may use now: for the
+    /// human never a side, only the top (`FigureAnchorPicker.restingEdges`).
+    private var restingEdges: FigureEdges {
+        FigureAnchorPicker.restingEdges(allowed: allowedEdges, restsAtSides: character.geometry.restsAtSides)
+    }
+
+    /// The character can stand still at `edge` outside an action (the
+    /// human can't at a side).
+    private func canStand(at edge: FigureEdge) -> Bool {
+        !edge.isSide || character.geometry.restsAtSides
+    }
+
     /// A random anchor and edge fully on screen: one where it can play
     /// something other than `lastAction`, on another anchor than `current`
-    /// (or another edge of it) when there is one; nil = none.
+    /// (or another edge of it) when there is one; nil = none. `resting`:
+    /// for a play without an action, among `restingEdges` — for the human
+    /// an edge of `current` first (`FigureAnchorPicker.restingPlacement`).
     private func pick(
-        excluding current: AnyHashable?, edge currentEdge: FigureEdge? = nil
+        excluding current: AnyHashable?, edge currentEdge: FigureEdge? = nil, resting: Bool = false
     ) -> (id: AnyHashable, edge: FigureEdge)? {
         var generator = SystemRandomNumberGenerator()
         let previous = lastAction
         let state = FigureSignpost.signposter.beginInterval("pick")
         defer { FigureSignpost.signposter.endInterval("pick", state) }
+        if resting, !character.geometry.restsAtSides {
+            return FigureAnchorPicker.restingPlacement(
+                current: current,
+                candidates: anchors.map { (id: $0.id, rect: $0.rect, edges: $0.edges) },
+                viewport: viewport,
+                viewportFor: { viewport(for: $0) },
+                sizes: metrics.sizes,
+                allowed: restingEdges,
+                using: &generator
+            )
+        }
         return FigureAnchorPicker.nextPlacement(
             current: current,
             currentEdge: currentEdge,
@@ -435,7 +467,7 @@ struct PeekingFigureView: View {
             viewport: viewport,
             viewportFor: { viewport(for: $0) },
             sizes: metrics.sizes,
-            allowed: allowedEdges,
+            allowed: resting ? restingEdges : allowedEdges,
             offersFresh: { id, rect, edge in
                 actions(at: edge, on: rect, anchor: id, from: nil).contains { $0 != previous }
             },
@@ -457,9 +489,10 @@ struct PeekingFigureView: View {
     }
 
     /// Where it comes out when nothing is picked and the current edge is not
-    /// allowed: the top, or the character's first edge without a top.
-    private var fallbackEdge: FigureEdge {
-        FigureEdge.allCases.first { allowedEdges.contains($0.member) } ?? .top
+    /// among `edges` (allowed now): the top, or the character's first edge
+    /// without a top.
+    private func fallbackEdge(_ edges: FigureEdges) -> FigureEdge {
+        FigureEdge.allCases.first { edges.contains($0.member) } ?? .top
     }
 
     /// Duck behind the card, come out elsewhere (maybe on another card or
@@ -546,7 +579,8 @@ struct PeekingFigureView: View {
         // Already out (two triggers in one update), or still waiting out the
         // first entrance's delay: nothing to do.
         guard isHidden, !isDelayingEntrance else { return }
-        guard !isScrolling || !hasPlayed, pick(excluding: anchorID) != nil else {
+        let resting = lowPowerMode || override == FigureActionName.rest
+        guard !isScrolling || !hasPlayed, pick(excluding: anchorID, resting: resting) != nil else {
             isParked = true
             return
         }
@@ -556,8 +590,14 @@ struct PeekingFigureView: View {
 
     /// - Parameters:
     ///   - chainStep: the next action of a run, from where it stands (the
-    ///     same action may come again).
+    ///     same action may come again) — or, relocating, elsewhere.
     ///   - leaving: straight back behind the card (`FigureVariation.leaving`).
+    ///
+    /// Where the character can't stand (the human at a side) nothing goes on
+    /// from the pose shown but leaving: any other play goes back the
+    /// action's own way first and comes out elsewhere, and a play without
+    /// an action (Low Power Mode, the rest asked for, nothing to play)
+    /// goes to a top instead — the same anchor's when it fits.
     private func play(
         entrance: FigureEntrance?, action override: String? = nil, relocating: Bool = false,
         chainStep: Bool = false, leaving: Bool = false
@@ -570,12 +610,65 @@ struct PeekingFigureView: View {
         previousSpot = current.spot
         previousAnchorID = current.anchor
         previousEdge = current.edge
+        // Low Power Mode: no action, only the rest pose (and its entrance).
+        let resting = lowPowerMode || override == FigureActionName.rest
+        // Out where it can't stand: leave the action's own way, come out again.
+        let leavesSide = !isHidden && !relocating && !leaving && !canStand(at: current.edge)
+        let relocating = relocating || leavesSide
+        let entrance = leavesSide ? entrance ?? style.entrance : entrance
+        // Nowhere to rest but a side it can't stand at: back behind the
+        // card from there (or stay hidden) until there is.
+        func waitHidden() {
+            anchorID = current.anchor
+            edge = current.edge
+            if isHidden {
+                isParked = true
+            } else {
+                play(entrance: nil, action: FigureActionName.rest, leaving: true)
+            }
+        }
         // Out of sight (ducking, or hidden behind the cards): pop up elsewhere.
         let popsUp = relocating || isHidden
         if popsUp {
-            let next = pick(excluding: current.anchor, edge: current.edge)
+            let next = pick(excluding: current.anchor, edge: current.edge, resting: resting)
+            if next == nil, resting, !character.geometry.restsAtSides {
+                waitHidden()
+                return
+            }
             anchorID = next?.id ?? current.anchor
-            edge = next?.edge ?? (allowedEdges.contains(current.edge.member) ? current.edge : fallbackEdge)
+            edge = next?.edge ?? (allowedEdges.contains(current.edge.member) ? current.edge : fallbackEdge(allowedEdges))
+        }
+        // Never the last action again while the edge has another.
+        let played: String
+        if resting {
+            played = FigureActionName.rest
+        } else if let override {
+            played = override
+        } else {
+            let available = anchorID.flatMap(rect(for:)).map {
+                actions(at: edge, on: $0, anchor: anchorID, from: popsUp ? nil : current.spot)
+            } ?? character.actions(at: edge, room: 0, atScreenEdge: false)
+            if chainStep, available.isEmpty {
+                // Nothing fits from here (a climb ended at the top of a side
+                // by the screen's edge): the run ends.
+                chainLeft = 0
+                anchorID = current.anchor
+                edge = current.edge
+                play(entrance: nil, action: FigureActionName.rest, leaving: true)
+                return
+            }
+            played = FigureRepertoire.next(
+                after: chainStep ? nil : lastAction, from: available, fallback: FigureActionName.rest, using: &generator
+            )
+        }
+        if played == FigureActionName.rest, !leaving, !canStand(at: edge) {
+            // No rest at a side: on a top instead, the same anchor's when it fits.
+            guard let place = pick(excluding: current.anchor, edge: current.edge, resting: true) else {
+                waitHidden()
+                return
+            }
+            anchorID = place.id
+            edge = place.edge
         }
         let rect = anchorID.flatMap(rect(for:))
         let visible = viewport(for: anchorID)
@@ -585,31 +678,11 @@ struct PeekingFigureView: View {
         let room = rect.map {
             metrics.travelRoom(at: edge, on: $0, viewport: visible, from: popsUp ? nil : current.spot)
         } ?? 0
-        // Low Power Mode: no action, only the rest pose (and its entrance).
-        // Never the last action again while the edge has another.
-        let played: String
-        if lowPowerMode {
-            played = FigureActionName.rest
-        } else if let override {
-            played = override
-        } else {
-            let available = rect.map { actions(at: edge, on: $0, anchor: anchorID, from: popsUp ? nil : current.spot) }
-                ?? character.actions(at: edge, room: room, atScreenEdge: false)
-            if chainStep, available.isEmpty {
-                // Nothing fits from here (a climb ended at the top of a side
-                // by the screen's edge): the run ends.
-                chainLeft = 0
-                play(entrance: nil, action: FigureActionName.rest, leaving: true)
-                return
-            }
-            played = FigureRepertoire.next(
-                after: chainStep ? nil : lastAction, from: available, fallback: FigureActionName.rest, using: &generator
-            )
-        }
-        // A fresh appearance draws how many actions it plays; other plays
-        // (after a celebration, Reduce Motion's rest, leaving) are single.
+        // A fresh appearance draws how many actions it plays (a run going on
+        // elsewhere keeps its count); other plays (after a celebration,
+        // Reduce Motion's rest, leaving) are single.
         let loopsFreely = canLoop && override == nil
-        if popsUp, loopsFreely {
+        if popsUp, loopsFreely, !chainStep {
             chainLeft = style.actionCount(using: &generator) - 1
         } else if !chainStep {
             chainLeft = 0
@@ -640,8 +713,9 @@ struct PeekingFigureView: View {
         spot = min(max(spot, range.lowerBound), range.upperBound)
         // A climb to the top of a side where nothing else fits from there (by
         // the screen's edge it only climbs) ends the run: it leaves its own
-        // way from the top instead of standing there to lean out and go back.
-        if travelsToTop, chainLeft > 0, let rect,
+        // way from the top. Not where it can't stand (the human): its run
+        // goes on elsewhere anyway (`FigureChain.Step.relocate`).
+        if travelsToTop, chainLeft > 0, canStand(at: edge), let rect,
            actions(at: edge, on: rect, anchor: anchorID, from: range.lowerBound).isEmpty {
             chainLeft = 0
         }

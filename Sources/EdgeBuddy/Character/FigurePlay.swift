@@ -120,7 +120,8 @@ struct FigureActionInfo: Equatable, Sendable {
 }
 
 enum FigureActionName {
-    /// The rest action every character has: standing (or hanging, or
-    /// peeking) at the edge's rest pose.
+    /// The rest action every character has: standing (or hanging) at the
+    /// edge's rest pose. The human has none at a side
+    /// (`FigureGeometry.restsAtSides`): it is never played there.
     static let rest = "rest"
 }

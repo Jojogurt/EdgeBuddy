@@ -12,15 +12,18 @@ EdgeBuddy adds one small, single-colour figure to a screen. It comes out from
 behind a card you mark, plays a short random action, goes back and comes out
 somewhere else:
 
-- **top edge** — stands on it: rests, waves, does jumping jacks, stretches,
+- **top edge** - stands on it: rests, waves, does jumping jacks, stretches,
   marches, inches along it like a caterpillar (worm walk), cartwheels into a
   handstand or runs along the edge;
-- **bottom edge** — hangs under it (wide grip): swings like a pendulum, pulls
+- **bottom edge** - hangs under it (wide grip): swings like a pendulum, pulls
   itself up;
-- **leading / trailing edge** — slides out from behind the card and plays
+- **leading / trailing edge** - reaches around the card's edge and plays
   beside it, outside its edge, holding on: does a human flag (hands wide apart on the edge, body held out flat), climbs up the
-  edge hand over hand (the flag and the climb come out hands first, straight
-  into the action) (only where enough of the side is on screen). Nothing
+  edge hand over hand (only where enough of the side is on screen). The flag
+  and the climb come out hands first, straight into the action, and go back
+  the same way: the figure never stands or rests at a side. In a run of
+  several actions (`actionsPerCycle`) it goes back behind the card after a
+  flag or a climb and comes out right away elsewhere with the next one. Nothing
   plays over the card. A side less than ~28 pt from the screen's edge (a
   full-width card, the outer side of a tile) has no room beside it and only
   climbs there — the figure may be cut by the screen's edge; a side facing
@@ -111,7 +114,9 @@ is the first thing in a scroll view, leave room above it or use
 ### Holding the stage
 
 While something else needs the screen (a celebration, a sheet animating in),
-pass `isWaiting: true`; the figure stays where it is and carries on afterwards:
+pass `isWaiting: true`; the figure stays where it is (at a side it goes back
+behind the card) and carries on afterwards. Coming out while waiting, it rests
+on a card's top, never at a side:
 
 ```swift
 .figureStage(isWaiting: isCelebrating)
@@ -242,6 +247,8 @@ ScrollView { … }
   `hold` for pins, `playsAtScreenEdge`. An empty list means the edge is never used.
 - `restPose(at:)` / `hiddenPose(at:)` and `entrance(at:)` — by default it
   rises from the hidden pose to the rest pose and sinks back the same way.
+  A character of your own keeps its rest pose at every edge, the sides
+  included (only `HumanFigure` never stands at a side).
 - `draw` and `pose(at:)` run on every frame: keep them cheap.
 
 Pin a character's action by name: `FigurePin(anchor: "hero", action: "float")`.
@@ -283,12 +290,14 @@ and with idle motion off. Pass `animated: false` to show the hold frame at
 once, without the entrance — the steadiest choice for snapshots — and `spot`
 (0…1, default 0.5) to move it along the edge.
 
-`FigurePose` lists the poses with a clear still frame: `.rest` (every edge),
-`.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand` (top),
-`.swing`, `.pullUp` (bottom), `.flag` (sides). A pose pinned at an
-edge it isn't played at rests there. If the anchor is not on screen or the
-figure doesn't fit at that edge, the stage plays as without a pin and takes
-the pin up as soon as it fits. `figurePinned(nil)` lets it play freely again.
+`FigurePose` lists the poses with a clear still frame: `.rest` (top and
+bottom), `.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand` (top),
+`.swing`, `.pullUp` (bottom), `.flag` (sides). A pose pinned at the top or
+the bottom where it isn't played rests there. A side only plays the flag:
+any other pose pinned at a side (`.rest` included) plays on the top of the
+same anchor. If the anchor is not on screen or the figure doesn't fit at that
+edge (or, for a side pin moved to the top, on the top), the stage plays as
+without a pin and takes the pin up as soon as it fits. `figurePinned(nil)` lets it play freely again.
 For a single card (`peekingFigure`) use
 `.figurePinned(.singleCard(pose: .wave))` — its anchor has no id of yours.
 `FigurePose` is the `HumanFigure`'s list; for a character of your own pin an
@@ -302,8 +311,10 @@ doesn't play at that edge rests; an edge it never uses falls back to the free st
   once it is out).
 - Hidden at accessibility text sizes (AX1 and larger), where it would cover
   too much of the larger text.
-- Reduce Motion: no loop, no tap relocation — it fades in and stands.
-- Low Power Mode: no loop and no actions — it comes out once and rests.
+- Reduce Motion: no loop, no tap relocation; it fades in and stands on a
+  card's top.
+- Low Power Mode: no loop and no actions; it comes out once and rests on a
+  card's top.
 - It stops while the scene is not active and its clock stops while it is off
   screen or holding still.
 

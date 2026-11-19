@@ -17,6 +17,13 @@ struct PinningTab: View {
         pinned ? FigurePin(anchor: anchor, edge: edge, pose: pose, spot: spot, animated: animated) : nil
     }
 
+    /// The poses played at the chosen edge: at a side only the flag (the
+    /// figure never stands there; any other pose pinned at a side would
+    /// play on the card's top).
+    private var poses: [FigurePose] {
+        FigurePose.allCases.filter { $0.edges.contains(edge) }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -51,7 +58,7 @@ struct PinningTab: View {
             }
             HStack {
                 Picker("Pose", selection: $pose) {
-                    ForEach(FigurePose.allCases, id: \.self) { Text("\($0)".capitalized).tag($0) }
+                    ForEach(poses, id: \.self) { Text("\($0)".capitalized).tag($0) }
                 }
                 Spacer()
                 Toggle("Animated", isOn: $animated).fixedSize()
@@ -59,6 +66,9 @@ struct PinningTab: View {
             LabeledContent("Spot") { Slider(value: $spot, in: 0...1) }
         }
         .pickerStyle(.menu)
+        .onChange(of: edge) {
+            if !poses.contains(pose), let first = poses.first { pose = first }
+        }
         .padding([.horizontal, .bottom])
         .disabled(false)
     }

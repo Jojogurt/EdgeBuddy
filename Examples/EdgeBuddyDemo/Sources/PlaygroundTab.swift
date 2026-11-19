@@ -67,7 +67,7 @@ struct PlaygroundTab: View {
                 VStack(spacing: 16) {
                     Card(title: "Today", height: 200)
                         .figureAnchor("today", edges: .all)
-                    Text("The figure stands on a card's top edge, hangs under its bottom edge and peeks at the sides.")
+                    Text("The figure stands on a card's top edge, hangs under its bottom edge and flags or climbs at the sides.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Card(title: "This week", height: 140)

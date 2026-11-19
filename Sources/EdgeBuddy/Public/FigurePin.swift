@@ -2,11 +2,13 @@ import SwiftUI
 
 /// A pose of ``HumanFigure`` a pinned figure (`FigurePin`) plays and then
 /// holds still in — the actions that have a clear still frame. Each belongs
-/// to an edge; pinned at another edge, the figure rests there instead. Its
-/// raw value is the action's name (`FigurePin.action`).
+/// to an edge (`edges`). Pinned at the top or the bottom where it isn't
+/// played, the figure rests there instead. A side only plays the flag (the
+/// figure never stands at a side): any other pose pinned at a side plays on
+/// the anchor's top. Its raw value is the action's name (`FigurePin.action`).
 public enum FigurePose: String, CaseIterable, Hashable, Sendable {
-    /// Standing with hands on hips (top), hanging (bottom), peeking from
-    /// behind the edge (sides) — every edge.
+    /// Standing with hands on hips (top), hanging (bottom). Pinned at a
+    /// side it stands on the anchor's top.
     case rest
     /// Top: one arm up in a greeting.
     case wave
@@ -28,7 +30,7 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     /// The edges this pose is played at.
     public var edges: FigureEdges {
         switch self {
-        case .rest: .all
+        case .rest: [.top, .bottom]
         case .wave, .jumpingJacks, .sideStretch, .march, .handstand: .top
         case .swing, .pullUp: .bottom
         case .flag: [.leading, .trailing]
@@ -69,8 +71,10 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
 /// figure comes out at `edge` of the anchor `anchor` (whatever edges that
 /// anchor allows), plays `action` and freezes at its hold frame
 /// (`FigureCharacterAction.hold`). An action the character doesn't play at
-/// that edge rests there instead; an edge it never plays at falls back as
-/// below. It never
+/// that edge rests there instead — except at a side of ``HumanFigure``,
+/// which has no rest there: anything but the flag pinned at a side plays on
+/// the anchor's top. An edge it never plays at (or that top, when the
+/// figure doesn't fit there) falls back as below. It never
 /// loops, ignores taps, and holds the frame also under Reduce Motion, in Low
 /// Power Mode and with idle motion off. When the anchor is not on screen or
 /// the figure does not fit at that edge, the stage behaves as without a pin
@@ -100,7 +104,8 @@ public struct FigurePin: Hashable, @unchecked Sendable {
     ///     under the stage; for `peekingFigure` use `singleCard(edge:pose:spot:animated:)`.
     ///   - edge: a single edge (of several, the first of top, bottom,
     ///     leading, trailing is used; an empty set means top).
-    ///   - pose: what it plays and holds; a pose of another edge rests.
+    ///   - pose: what it plays and holds; a pose of another edge rests (at
+    ///     a side, where only the flag plays, it plays on the anchor's top).
     ///   - spot: where along the edge, 0…1, clamped to the part on screen;
     ///     0.5 (the middle) by default.
     ///   - animated: false = the hold frame at once, no entrance — the
@@ -203,12 +208,19 @@ struct FigurePinnedPlay: Equatable {
 
     /// The pin's anchor and edge when that anchor is among `anchors` and the
     /// figure fits there and shows whole (`FigureAnchorPicker.isEligible`);
-    /// nil = fall back to the free stage.
+    /// nil = fall back to the free stage. At a side where the character has
+    /// no rest (the human) and doesn't play the action, the anchor's top.
     static func resolve(
         _ pin: FigurePin, anchors: [FigureAnchorFrame], viewport stage: CGRect?,
         metrics: PeekingFigureMetrics, style: FigureStyle, character: AnyFigureCharacter = HumanRig.standard
     ) -> FigurePinnedPlay? {
-        let edge = pin.figureEdge
+        var edge = pin.figureEdge
+        // No rest at a side (the human): what the side doesn't play goes
+        // to the anchor's top instead.
+        if edge.isSide, !character.geometry.restsAtSides,
+           character.pinnedAction(pin.action, at: edge) == FigureActionName.rest {
+            edge = .top
+        }
         guard character.geometry.supportedEdges.contains(edge.member),
               let frame = anchors.first(where: { $0.id == pin.anchor }) else { return nil }
         // The anchor's own scroll view, else the stage's.

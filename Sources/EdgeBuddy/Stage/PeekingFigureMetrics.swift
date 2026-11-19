@@ -52,7 +52,7 @@ struct PeekingFigureMetrics: Equatable, Sendable {
     /// What a side figure draws: beside the card, outside its side edge
     /// (drawn at the trailing edge, leading = mirrored), from just inside the
     /// edge (`FigureEdgePoses.sideMaskX`, the gripping hands) out to grid x
-    /// 200 (the flag's feet), tall enough for the peek, flag and climb.
+    /// 200 (the flag's feet), tall enough for the flag and the climb.
     static let sideBox = CGRect(
         x: FigureEdgePoses.sideMaskX, y: 0, width: 2 * FigureEdgePoses.sideEdgeX - FigureEdgePoses.sideMaskX, height: 112
     )

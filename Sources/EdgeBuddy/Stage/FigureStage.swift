@@ -38,7 +38,7 @@ extension View {
     /// - Parameters:
     ///   - id: unique among the stage's anchors (also across segments).
     ///   - edges: edges the figure may come out at: stands on the top, hangs
-    ///     under the bottom, peeks / flags / climbs at the sides. Each is used
+    ///     under the bottom, flags or climbs at the sides. Each is used
     ///     only while the figure fits there and that part is on screen.
     public func figureAnchor(_ id: some Hashable, edges: FigureEdges = .top) -> some View {
         modifier(FigureAnchorModifier(id: AnyHashable(id), edges: edges))
@@ -75,8 +75,9 @@ extension View {
     ///   - isEnabled: false = no figure.
     ///   - style: entrance, tempo and the first entrance's delay.
     ///   - isWaiting: true while something else holds the stage (say a
-    ///     celebration); the figure stays where it is (or behind its card)
-    ///     and carries on once it ends.
+    ///     celebration); the figure stays where it is (or behind its card;
+    ///     at a side it goes back behind it, and it comes out on a top) and
+    ///     carries on once it ends.
     ///   - loops: true = it never settles (only while idle motion is
     ///     allowed, see `figureMotionEnabled(_:)`); otherwise it comes out
     ///     once and stands.

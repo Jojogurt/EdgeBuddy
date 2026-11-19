@@ -14,6 +14,11 @@ struct FigureGeometry: Equatable, Sendable {
     /// The least room along a side a side action that plays at the screen's
     /// edge needs, the character's units; nil = none plays there.
     var screenEdgeSideRoom: Double?
+    /// The character has a rest pose at the sides it can stand in outside
+    /// an action. The human has none: at a side it only shows while it
+    /// flags or climbs, so a play without an action, a pin it doesn't play
+    /// there and a run going on never stay at a side.
+    var restsAtSides = true
 
     func box(_ edge: FigureEdge) -> FigureCharacterBox {
         switch edge {
@@ -33,7 +38,8 @@ struct FigureGeometry: Equatable, Sendable {
         trailing: FigureCharacterBox(PeekingFigureMetrics.sideBox, edge: FigureEdgePoses.sideEdgeX),
         referenceHeight: FigureSkeleton.peekBox.height,
         supportedEdges: .all,
-        screenEdgeSideRoom: FigureRepertoire.screenEdgeSide.compactMap(FigureTimeline.minimumTravel).min()
+        screenEdgeSideRoom: FigureRepertoire.screenEdgeSide.compactMap(FigureTimeline.minimumTravel).min(),
+        restsAtSides: false
     )
 }
 

@@ -38,6 +38,24 @@ struct ChainedActionsTests {
         #expect(FigureChain.afterAction(left: 2, isScrolling: false, canLoop: false, isWaiting: false) == .stand)
     }
 
+    @Test("After an action of a run where it can't stand (a side): relocate or leave, never stand")
+    func afterActionAtSide() {
+        func step(left: Int, scrolling: Bool = false, canLoop: Bool = true, waiting: Bool = false) -> FigureChain.Step {
+            FigureChain.afterAction(
+                left: left, isScrolling: scrolling, canLoop: canLoop, isWaiting: waiting, canStand: false
+            )
+        }
+        // The run goes on elsewhere.
+        #expect(step(left: 2) == .relocate)
+        #expect(step(left: 1) == .relocate)
+        // Over, or cut by a scroll: back behind the card.
+        #expect(step(left: 0) == .leave)
+        #expect(step(left: 2, scrolling: true) == .leave)
+        // A celebration or idle motion off: back behind the card too, not standing.
+        #expect(step(left: 2, waiting: true) == .leave)
+        #expect(step(left: 2, canLoop: false) == .leave)
+    }
+
     @Test("Mid-run an action ends standing; the last one leaves and hides")
     func chainedVariation() {
         var generator = SystemRandomNumberGenerator()
