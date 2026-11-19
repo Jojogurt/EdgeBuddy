@@ -43,7 +43,7 @@ enter the URL, or in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Jojogurt/EdgeBuddy.git", from: "0.4.0"),
+    .package(url: "https://github.com/Jojogurt/EdgeBuddy.git", from: "0.4.1"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: ["EdgeBuddy"]),
@@ -56,7 +56,7 @@ XcodeGen (`project.yml`):
 packages:
   EdgeBuddy:
     url: https://github.com/Jojogurt/EdgeBuddy.git
-    from: 0.4.0
+    from: 0.4.1
 ```
 
 ## Quick start

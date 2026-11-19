@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## 0.4.1 - 2026-11-19
+
+- Performance: the far arm and leg are drawn through an offscreen layer only while they fade
+  (in profile); facing front they go straight onto the canvas, with the same result. The
+  default human figure is built once instead of on every stage update (every scroll frame).
+
 ## 0.4.0 — 2026-11-09
 
 - New: `FigureStyle.actionsPerCycle` — how many actions the figure plays each time it comes
