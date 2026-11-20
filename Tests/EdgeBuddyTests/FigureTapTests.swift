@@ -30,7 +30,7 @@ struct FigureTapTests {
         // What `PeekingFigureView.play` asks for on a waiting tap: the rest,
         // relocating, single (no loop variation), from the top's rest.
         let play = human.play(FigurePlayRequest(
-            action: FigureActionName.rest, entrance: FigureStyle.standard.entrance, reduceMotion: false,
+            action: FigureRest.name, entrance: FigureStyle.standard.entrance, reduceMotion: false,
             edge: .top, relocating: true, previousEdge: .top, previousPose: FigureJoints.rest,
             tempo: FigureStyle.standard.tempo, variation: .standard
         ))

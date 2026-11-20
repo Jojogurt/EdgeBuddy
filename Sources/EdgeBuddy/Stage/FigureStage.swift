@@ -5,6 +5,8 @@ import SwiftUI
 struct FigureAnchorItem {
     let id: AnyHashable
     let edges: FigureEdges
+    /// The action names it allows; nil = the character's random repertoire.
+    let actions: Set<String>?
     let bounds: Anchor<CGRect>
     /// Visible areas of the scroll views the view sits in, in global space;
     /// nil = not in a scroll view (or not measured yet).
@@ -19,6 +21,9 @@ struct FigureAnchorFrame: Equatable {
     /// The part of the stage this anchor's scroll view shows (between its
     /// bars), in the stage's space; nil = the stage's own viewport.
     var viewport: CGRect?
+    /// The action names it allows (`figureAnchor(_:edges:actions:)`); nil =
+    /// the character's random repertoire, without opt-in actions.
+    var actions: Set<String>?
 }
 
 /// Collects the marked views under a stage, in layout order.
@@ -35,20 +40,39 @@ extension View {
     /// come out from behind. Any view works — usually a card at least
     /// ~110 pt wide. Takes no space and changes nothing without a stage.
     ///
+    /// ```swift
+    /// PodiumStep(winner).figureAnchor("podium", actions: [.celebrate])
+    /// ```
+    ///
     /// - Parameters:
     ///   - id: unique among the stage's anchors (also across segments).
     ///   - edges: edges the figure may come out at: stands on the top, hangs
     ///     under the bottom, flags or climbs at the sides. Each is used
     ///     only while the figure fits there and that part is on screen.
-    public func figureAnchor(_ id: some Hashable, edges: FigureEdges = .top) -> some View {
-        modifier(FigureAnchorModifier(id: AnyHashable(id), edges: edges))
+    ///   - actions: what the figure may play here. nil (the default) = the
+    ///     character's random repertoire at each edge, without opt-in
+    ///     actions (``FigureActionName/celebrate``). A list = only those
+    ///     actions, opt-in ones included, each at the edges where the
+    ///     character plays it (`.celebrate` on the top, `.flag` at a side);
+    ///     an edge left with none of them is not used for an action. With
+    ///     nothing playable at any of its edges (`[]`, or a list the edges or
+    ///     the room on screen rule out) the anchor is used only when no other
+    ///     anchor has an action, and the figure then rests there. The rest is
+    ///     not an action: Reduce Motion, Low Power Mode and `isWaiting` rest
+    ///     on any anchor as before. Pins (`figurePinned(_:)`) ignore the list.
+    public func figureAnchor(
+        _ id: some Hashable, edges: FigureEdges = .top, actions: [FigureActionName]? = nil
+    ) -> some View {
+        modifier(FigureAnchorModifier(
+            id: AnyHashable(id), edges: edges, actions: actions.map { Set($0.map(\.rawValue)) }
+        ))
     }
 
     /// One small figure for the whole screen, put on the screen's
     /// `ScrollView`: each cycle it comes out from behind another marked view
-    /// (`figureAnchor(_:edges:)`) that is fully on screen — never the same
-    /// one twice in a row when there is another — plays a random action,
-    /// goes back and comes out elsewhere. A tap moves it too. It rides along
+    /// (`figureAnchor(_:edges:actions:)`) that is fully on screen (never the
+    /// same one twice in a row when there is another), plays a random action
+    /// (among those the anchor allows), goes back and comes out elsewhere. A tap moves it too. It rides along
     /// while the content scrolls and waits for the scroll to stop before
     /// coming out.
     ///
@@ -94,7 +118,7 @@ extension View {
     /// with this single anchor, not bounded by the screen. For one-off cards
     /// (onboarding, empty states); screens with several cards use
     /// `figureStage(isEnabled:style:isWaiting:loops:)` +
-    /// `figureAnchor(_:edges:)`. It takes no space: put the card after the
+    /// `figureAnchor(_:edges:actions:)`. It takes no space: put the card after the
     /// content above it, and leave room (or `scrollClipDisabled()`) where the
     /// card is first in a scroll view.
     ///
@@ -105,10 +129,15 @@ extension View {
     ///     waits and carries on once it ends.
     ///   - loops: true = it never settles (only while idle motion is
     ///     allowed); otherwise it comes out once and stands.
+    ///   - actions: what it may play on the card's top, as
+    ///     `figureAnchor(_:edges:actions:)`; nil = the top's random
+    ///     repertoire, without opt-in actions. `[.celebrate]` = only the
+    ///     celebration.
     public func peekingFigure(
-        isEnabled: Bool = true, style: FigureStyle = .standard, isWaiting: Bool = false, loops: Bool = true
+        isEnabled: Bool = true, style: FigureStyle = .standard, isWaiting: Bool = false, loops: Bool = true,
+        actions: [FigureActionName]? = nil
     ) -> some View {
-        figureAnchor(SoloAnchor.id)
+        figureAnchor(SoloAnchor.id, actions: actions)
             .modifier(FigureStageModifier(
                 isEnabled: isEnabled, style: style, isWaiting: isWaiting, loops: loops, isBounded: false
             ))
@@ -119,6 +148,7 @@ extension View {
 private struct FigureAnchorModifier: ViewModifier {
     let id: AnyHashable
     let edges: FigureEdges
+    let actions: Set<String>?
     @State private var region: FigureViewport.Parts?
 
     func body(content: Content) -> some View {
@@ -137,7 +167,7 @@ private struct FigureAnchorModifier: ViewModifier {
                 )
             } action: { region = $0 }
             .anchorPreference(key: FigureAnchorsKey.self, value: .bounds) {
-                [FigureAnchorItem(id: id, edges: edges, bounds: $0, region: region)]
+                [FigureAnchorItem(id: id, edges: edges, actions: actions, bounds: $0, region: region)]
             }
     }
 }
@@ -301,7 +331,8 @@ private struct FigureStageModifier: ViewModifier {
                                             stage: stage,
                                             region: FigureViewport.region($0.region, pagerBleed: metrics.pagerBleed),
                                             origin: origin
-                                        ) : nil
+                                        ) : nil,
+                                    actions: $0.actions
                                 )
                             },
                             viewport: isBounded ? stage : nil,

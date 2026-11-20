@@ -14,8 +14,9 @@ somewhere else:
 
 - **top edge** - stands on it: rests, waves, does jumping jacks, stretches,
   marches, inches along it like a caterpillar (worm walk), cartwheels into a
-  handstand, runs along the edge or celebrates like a winner on the podium
-  (hops with both arms up in a V);
+  handstand or runs along the edge; on a card that asks for it, celebrates like
+  a winner on the podium (hops with both arms up in a V, see
+  [Actions per anchor](#actions-per-anchor));
 - **bottom edge** - hangs under it (wide grip): swings like a pendulum, pulls
   itself up;
 - **leading / trailing edge** - reaches around the card's edge and plays
@@ -127,7 +128,7 @@ on a card's top, never at a side:
 
 ## Edges and weights
 
-`figureAnchor(_:edges:)` takes a `FigureEdges` set: `.top` (default),
+`figureAnchor(_:edges:actions:)` takes a `FigureEdges` set: `.top` (default),
 `.bottom`, `.leading`, `.trailing` or `.all`. Each cycle the stage picks a
 random anchor that is fully on screen (never the same one twice in a row when
 there is another), then an edge of it, evenly:
@@ -143,6 +144,39 @@ actions need more room: the climb needs ~136 pt of the side on screen (it
 climbs at least ~54 pt, always to the top of the visible side), the worm walk ~33 pt of free width on one side of
 it; elsewhere the edge simply plays its other actions. Sizes scale with
 `figureHeight(_:)`.
+
+### Actions per anchor
+
+`figureAnchor(_:edges:actions:)` also takes the actions the figure may play on
+that anchor. `nil` (the default) is the edge's random repertoire. A list
+(`FigureActionName`: `.wave`, `.march`, `.celebrate`, `.flag`, ...) narrows it
+to those actions, each played at the edges where it belongs (`.celebrate` and
+`.wave` on the top, `.swing` under the bottom, `.flag` at a side):
+
+```swift
+// The winner's podium step: only the celebration, and only here.
+PodiumStep(winner)
+    .figureAnchor("podium", actions: [.celebrate])
+
+// Only waves and swings on this card, nothing at its sides.
+HeroCard()
+    .figureAnchor("hero", edges: [.top, .bottom], actions: [.wave, .swing])
+```
+
+- **Opt-in actions.** The celebration (`.celebrate`) is opt-in: it is never
+  drawn at random, only played on anchors that list it. A character of your
+  own marks such actions with `FigureCharacterAction(..., optIn: true)` and
+  names them in the list by name (`actions: ["cheer"]`).
+- An edge with none of the listed actions (or without room for them on
+  screen) is not used for an action. An anchor with nothing playable at any
+  of its edges (`actions: []`, `[.flag]` on a top-only anchor) is used only
+  when no other anchor has an action, and the figure then just rests there.
+- With only one action allowed the figure plays it again each time
+  (normally it avoids repeating the last action).
+- The rest is not an action: Reduce Motion, Low Power Mode and `isWaiting`
+  rest on any anchor as before. Taps and runs (`actionsPerCycle`) pick from
+  the same list. Pins (`figurePinned(_:)`) ignore it.
+- A single card takes the same list: `.peekingFigure(actions: [.celebrate])`.
 
 ## Customization
 
@@ -245,7 +279,9 @@ ScrollView { … }
 - `actions(at:)` — one beat of `FigureMotion` (`pose(at:)` over a duration,
   or `through:` a few poses), repeated `repeats` times, optionally travelling
   along the edge (`travel`; a side's travelling action goes up to the top),
-  `hold` for pins, `playsAtScreenEdge`. An empty list means the edge is never used.
+  `hold` for pins, `playsAtScreenEdge`, `optIn` (played only on anchors that
+  list it, see [Actions per anchor](#actions-per-anchor)). An empty list means
+  the edge is never used.
 - `restPose(at:)` / `hiddenPose(at:)` and `entrance(at:)` — by default it
   rises from the hidden pose to the rest pose and sinks back the same way.
   A character of your own keeps its rest pose at every edge, the sides

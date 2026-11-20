@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Edges of an anchor (`figureAnchor(_:edges:)`) the figure may come out
+/// Edges of an anchor (`figureAnchor(_:edges:actions:)`) the figure may come out
 /// at. The stage draws an edge among the allowed ones that fit and are on
 /// screen, evenly: 25% each (renormalized over
 /// the edges that are possible right now).

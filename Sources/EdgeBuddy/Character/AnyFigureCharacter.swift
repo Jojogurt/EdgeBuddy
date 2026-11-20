@@ -52,6 +52,9 @@ struct AnyFigureCharacter: Sendable {
     /// one type can't be drawn by another).
     let typeID: ObjectIdentifier
     let geometry: FigureGeometry
+    /// Names of the actions played only where an anchor lists them
+    /// (`FigureCharacterAction.isOptIn`; the human's celebration).
+    let optInActions: Set<String>
     private let actionsAt: @Sendable (_ edge: FigureEdge, _ room: Double, _ atScreenEdge: Bool) -> [String]
     private let infoFor: @Sendable (_ action: String, _ edge: FigureEdge) -> FigureActionInfo
     private let pinnedAt: @Sendable (_ action: String, _ edge: FigureEdge) -> String
@@ -71,6 +74,7 @@ struct AnyFigureCharacter: Sendable {
     init(
         typeID: ObjectIdentifier, geometry: FigureGeometry,
         actions: @escaping @Sendable (FigureEdge, Double, Bool) -> [String],
+        optIn: Set<String> = [],
         info: @escaping @Sendable (String, FigureEdge) -> FigureActionInfo,
         pinned: @escaping @Sendable (String, FigureEdge) -> String,
         play: @escaping @Sendable (FigurePlayRequest) -> FigurePlay,
@@ -79,6 +83,7 @@ struct AnyFigureCharacter: Sendable {
         self.typeID = typeID
         self.geometry = geometry
         self.actionsAt = actions
+        self.optInActions = optIn
         self.infoFor = info
         self.pinnedAt = pinned
         self.makePlay = play
@@ -88,8 +93,16 @@ struct AnyFigureCharacter: Sendable {
     /// What it may play at `edge` with `room` units to travel along it; a
     /// side `atScreenEdge` has no room beside the card. Empty = nothing
     /// (the stage then only rests there).
-    func actions(at edge: FigureEdge, room: Double, atScreenEdge: Bool) -> [String] {
-        actionsAt(edge, room, atScreenEdge)
+    ///
+    /// `listed`: the actions the anchor allows (`figureAnchor(_:edges:actions:)`)
+    /// (only those, opt-in ones included); nil = the random repertoire,
+    /// without the opt-in actions.
+    func actions(at edge: FigureEdge, room: Double, atScreenEdge: Bool, listed: Set<String>? = nil) -> [String] {
+        let all = actionsAt(edge, room, atScreenEdge)
+        guard let listed else {
+            return optInActions.isEmpty ? all : all.filter { !optInActions.contains($0) }
+        }
+        return all.filter(listed.contains)
     }
 
     func info(_ action: String, at edge: FigureEdge) -> FigureActionInfo {

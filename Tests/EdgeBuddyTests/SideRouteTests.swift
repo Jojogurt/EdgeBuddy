@@ -176,7 +176,7 @@ struct SideRouteTests {
                 let variation = FigureVariation.leaving(exit: .spring, using: &generator)
                 // As the stage asks for it: the rest, leaving, from the pose shown.
                 let timeline = HumanRig.timeline(FigurePlayRequest(
-                    action: FigureActionName.rest, entrance: nil, reduceMotion: false, edge: edge,
+                    action: FigureRest.name, entrance: nil, reduceMotion: false, edge: edge,
                     previousEdge: edge, previousPose: pose, variation: variation
                 ))
                 #expect(timeline.keyframes.map(\.joints) == [pose] + route.exit.map(\.joints))

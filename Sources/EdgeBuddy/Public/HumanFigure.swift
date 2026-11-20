@@ -15,7 +15,8 @@ public enum FigureHead: Sendable {
 
 /// The built-in figure: a stick figure with a skeleton, two-bone IK and the
 /// whole repertoire — waves, jumping jacks, a worm walk, a handstand and a
-/// winner's celebration on the top, swings and pull-ups under the bottom,
+/// winner's celebration (opt-in, see `figureAnchor(_:edges:actions:)`) on
+/// the top, swings and pull-ups under the bottom,
 /// flags and climbs at the sides — with the climb or spring entrance of `FigureStyle`.
 ///
 /// It is the default character. Set it with `figureCharacter(_:)` to tune
@@ -107,7 +108,8 @@ public struct HumanFigure: FigureCharacter {
     /// The repertoire at `edge`, each action as one whole play from the rest
     /// pose back to it; at a side, where it has no rest, from the action's
     /// own held pose back to it (the stage itself plays the rig, with its
-    /// random repeat counts, routes and grips).
+    /// random repeat counts, routes and grips). The celebration is opt-in
+    /// (`isOptIn`): it plays only on anchors that list it.
     public func actions(at edge: FigureEdge) -> [FigureCharacterAction<Pose>] {
         FigureRepertoire.actions(for: edge).map { action in
             let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: edge)
@@ -116,7 +118,8 @@ public struct HumanFigure: FigureCharacter {
                 motion: FigureMotion(duration: timeline.duration) { Pose(timeline.joints(at: $0)) },
                 travel: FigureTimeline.travel(action, repeats: FigureTimeline.canvasRepeats(action)) ?? 0,
                 hold: timeline.holdTime,
-                playsAtScreenEdge: FigureRepertoire.screenEdgeSide.contains(action)
+                playsAtScreenEdge: FigureRepertoire.screenEdgeSide.contains(action),
+                optIn: FigureRepertoire.optIn.contains(action)
             )
         }
     }

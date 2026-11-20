@@ -15,6 +15,7 @@ enum HumanRig {
             actions: { edge, room, atScreenEdge in
                 FigureRepertoire.actions(for: edge, room: room, atScreenEdge: atScreenEdge).map(\.name)
             },
+            optIn: Set(FigureRepertoire.optIn.map(\.name)),
             info: { name, _ in info(FigureAction(name: name) ?? .rest) },
             pinned: { name, edge in (FigurePose(name: name)?.action(at: edge) ?? .rest).name },
             play: { FigurePlay(timeline($0)) },

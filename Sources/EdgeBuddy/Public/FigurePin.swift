@@ -21,6 +21,8 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     /// Top: balanced on its hands, legs up.
     case handstand
     /// Top: standing tall with both arms up in a V, a winner on the podium.
+    /// Pinnable anywhere; played freely only on anchors that list it
+    /// (`figureAnchor(_:edges:actions:)`).
     case celebrate
     /// Bottom: swung out to one side, hanging by its hands.
     case swing
@@ -84,7 +86,7 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
 /// (and takes the pin up as soon as it fits).
 // Sendable: `anchor` only ever wraps a `Sendable` id (see `init`).
 public struct FigurePin: Hashable, @unchecked Sendable {
-    /// The anchor's id, as passed to `figureAnchor(_:edges:)`.
+    /// The anchor's id, as passed to `figureAnchor(_:edges:actions:)`.
     public let anchor: AnyHashable
     /// The edge the figure comes out at.
     public let edge: FigureEdges
@@ -103,7 +105,7 @@ public struct FigurePin: Hashable, @unchecked Sendable {
     /// A pin at `edge` of the anchor `anchor`, holding `pose`.
     ///
     /// - Parameters:
-    ///   - anchor: the id of a view marked with `figureAnchor(_:edges:)`
+    ///   - anchor: the id of a view marked with `figureAnchor(_:edges:actions:)`
     ///     under the stage; for `peekingFigure` use `singleCard(edge:pose:spot:animated:)`.
     ///   - edge: a single edge (of several, the first of top, bottom,
     ///     leading, trailing is used; an empty set means top).
@@ -202,7 +204,7 @@ struct FigurePinnedPlay: Equatable {
     let edge: FigureEdge
     /// Spot along the edge (`FigurePlacement`), within the part on screen.
     let spot: Double
-    /// The action's name (`FigureActionName.rest` when the character does
+    /// The action's name (`FigureRest.name` when the character does
     /// not play the pinned one at this edge).
     let action: String
     let timeline: FigurePlay
@@ -221,7 +223,7 @@ struct FigurePinnedPlay: Equatable {
         // No rest at a side (the human): what the side doesn't play goes
         // to the anchor's top instead.
         if edge.isSide, !character.geometry.restsAtSides,
-           character.pinnedAction(pin.action, at: edge) == FigureActionName.rest {
+           character.pinnedAction(pin.action, at: edge) == FigureRest.name {
             edge = .top
         }
         guard character.geometry.supportedEdges.contains(edge.member),

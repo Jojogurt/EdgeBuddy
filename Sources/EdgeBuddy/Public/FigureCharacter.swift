@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// An edge of a marked view (`figureAnchor(_:edges:)`) a character plays at.
+/// An edge of a marked view (`figureAnchor(_:edges:actions:)`) a character plays at.
 ///
 /// Top: it stands on the edge, the rest hidden below it. Bottom: it hangs
 /// under the edge, hidden above it. Sides: it plays beside the card, outside
@@ -105,15 +105,19 @@ public struct FigureCharacterAction<Pose: FigureCharacterPose>: Sendable {
     /// false = not played at a side less than ~28 pt from the screen's edge,
     /// where there is no room beside the card (the human only climbs there).
     public var playsAtScreenEdge: Bool
+    /// true = played only on anchors that list it
+    /// (`figureAnchor(_:edges:actions:)`), never drawn at random elsewhere
+    /// (``HumanFigure``'s celebration is). false by default.
+    public var isOptIn: Bool
 
     /// The room along the edge it needs: `travel` times the fewest beats.
     /// Edges with less room on screen don't offer it.
     public var minimumRoom: Double { travel * Double(repeats.lowerBound) }
 
-    /// An action called `name` playing `motion` per beat.
+    /// An action called `name` playing `motion` per beat; `optIn`: see `isOptIn`.
     public init(
         _ name: String, motion: FigureMotion<Pose>, repeats: ClosedRange<Int> = 1...1,
-        travel: Double = 0, hold: Double? = nil, playsAtScreenEdge: Bool = true
+        travel: Double = 0, hold: Double? = nil, playsAtScreenEdge: Bool = true, optIn: Bool = false
     ) {
         self.name = name
         self.motion = motion
@@ -121,6 +125,7 @@ public struct FigureCharacterAction<Pose: FigureCharacterPose>: Sendable {
         self.travel = max(travel, 0)
         self.hold = hold
         self.playsAtScreenEdge = playsAtScreenEdge
+        self.isOptIn = optIn
     }
 }
 
@@ -162,7 +167,10 @@ public protocol FigureCharacter: Sendable {
     func box(at edge: FigureEdge) -> FigureCharacterBox
 
     /// What it may play at `edge`, drawn at random (never the same twice in
-    /// a row when there is another). Empty = it never comes out at `edge`.
+    /// a row when there is another), narrowed per anchor by
+    /// `figureAnchor(_:edges:actions:)`; opt-in actions
+    /// (`FigureCharacterAction.isOptIn`) only where an anchor lists them.
+    /// Empty = it never comes out at `edge`.
     func actions(at edge: FigureEdge) -> [FigureCharacterAction<Pose>]
 
     /// The pose every play at `edge` starts and ends in, out from behind the card.

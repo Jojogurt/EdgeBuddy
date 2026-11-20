@@ -93,7 +93,7 @@ struct FigureFrame {
 
 /// What the stage asks a character to play.
 struct FigurePlayRequest {
-    /// The action's name; `FigureActionName.rest` = only the rest pose.
+    /// The action's name; `FigureRest.name` = only the rest pose.
     var action: String
     /// How it comes out from behind the card first; nil = already out.
     var entrance: FigureEntrance?
@@ -119,9 +119,9 @@ struct FigureActionInfo: Equatable, Sendable {
     var defaultRepeats: Int
 }
 
-enum FigureActionName {
+enum FigureRest {
     /// The rest action every character has: standing (or hanging) at the
     /// edge's rest pose. The human has none at a side
     /// (`FigureGeometry.restsAtSides`): it is never played there.
-    static let rest = "rest"
+    static let name = "rest"
 }

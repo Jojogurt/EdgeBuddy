@@ -84,10 +84,13 @@ struct FigureCharacterTests {
         #expect(PeekingFigureMetrics(height: 56, geometry: human.geometry) == .standard)
         for edge in FigureEdge.allCases {
             let room = 1000.0
-            #expect(human.actions(at: edge, room: room, atScreenEdge: false)
-                == FigureRepertoire.actions(for: edge, room: room).map(\.name))
-            #expect(human.actions(at: edge, room: room, atScreenEdge: true)
-                == FigureRepertoire.actions(for: edge, room: room, atScreenEdge: true).map(\.name))
+            // The random repertoire leaves out the opt-in actions (the celebration).
+            let random = { (atScreenEdge: Bool) in
+                FigureRepertoire.actions(for: edge, room: room, atScreenEdge: atScreenEdge)
+                    .filter { !FigureRepertoire.optIn.contains($0) }.map(\.name)
+            }
+            #expect(human.actions(at: edge, room: room, atScreenEdge: false) == random(false))
+            #expect(human.actions(at: edge, room: room, atScreenEdge: true) == random(true))
             for action in FigureRepertoire.actions(for: edge) {
                 let variation = FigureVariation(holdBefore: 0.5, repeats: 2, holdAfter: 0.7, exit: .spring, hiddenPause: 1)
                 let play = human.play(FigurePlayRequest(
@@ -176,8 +179,8 @@ struct FigureCharacterTests {
         #expect(blob.info("drift", at: .top) == FigureActionInfo(travelPerBeat: 25, repeatRange: 2...4, defaultRepeats: 2))
         #expect(blob.info("bob", at: .top).travelPerBeat == nil)
         #expect(blob.pinnedAction("boo", at: .top) == "boo")
-        #expect(blob.pinnedAction("boo", at: .leading) == FigureActionName.rest)
-        #expect(blob.pinnedAction("wave", at: .top) == FigureActionName.rest)
+        #expect(blob.pinnedAction("boo", at: .leading) == FigureRest.name)
+        #expect(blob.pinnedAction("wave", at: .top) == FigureRest.name)
     }
 
     @Test("A play: rise from hidden, beats, back behind the card")
@@ -265,7 +268,7 @@ struct FigureCharacterTests {
 
     @Test("Low Power / rest: out to the rest pose and stands")
     func customRest() throws {
-        let play = blob.play(FigurePlayRequest(action: FigureActionName.rest, entrance: .spring, reduceMotion: false))
+        let play = blob.play(FigurePlayRequest(action: FigureRest.name, entrance: .spring, reduceMotion: false))
         let seq = try sequence(play)
         #expect(abs(play.duration - FigureSequence<BlobFigure.Pose>.riseDuration) < 1e-9)
         #expect(seq.pose(at: play.duration) == BlobFigure().restPose(at: .top))

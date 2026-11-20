@@ -22,6 +22,7 @@ enum CustomRig {
                     .filter { $0.minimumRoom <= room + 1e-9 && (!atScreenEdge || $0.playsAtScreenEdge) }
                     .map(\.name)
             },
+            optIn: table.optIn,
             info: { name, edge in
                 guard let action = table.action(name, at: edge) else {
                     return FigureActionInfo(travelPerBeat: nil, repeatRange: 1...1, defaultRepeats: 1)
@@ -31,7 +32,7 @@ enum CustomRig {
                     repeatRange: action.repeats, defaultRepeats: action.repeats.lowerBound
                 )
             },
-            pinned: { name, edge in table.action(name, at: edge) == nil ? FigureActionName.rest : name },
+            pinned: { name, edge in table.action(name, at: edge) == nil ? FigureRest.name : name },
             play: { request in
                 FigurePlay(FigureSequence(character, action: table.action(request.action, at: request.edge), request: request))
             },
@@ -71,6 +72,11 @@ enum CustomRig {
 
         func action(_ name: String, at edge: FigureEdge) -> FigureCharacterAction<Pose>? {
             self[edge].first { $0.name == name }
+        }
+
+        /// Names of the opt-in actions (`FigureCharacterAction.isOptIn`), any edge.
+        var optIn: Set<String> {
+            Set(FigureEdge.allCases.flatMap { self[$0] }.filter(\.isOptIn).map(\.name))
         }
 
         var supportedEdges: FigureEdges {

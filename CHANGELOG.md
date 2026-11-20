@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## 0.6.0 - 2026-11-20
+
+- Added: per-anchor actions. `figureAnchor(_:edges:actions:)` takes the actions the figure may
+  play on that anchor, as `FigureActionName`s (`.wave`, `.march`, `.celebrate`, `.flag`, ...;
+  a custom character's action by name, `"cheer"`). nil (the default) keeps the edge's random
+  repertoire. A list narrows every choice on that anchor: the random pick of each cycle, the
+  actions of a run (`FigureStyle.actionsPerCycle`) and the pick after a tap. Each listed action
+  plays at the edges where it belongs and only with room for it on screen; an edge with none
+  of them is not used for an action. An anchor with nothing playable at any of its edges is
+  used only when no other anchor has an action, and the figure then rests there. With a single
+  action allowed it plays that action every time. The rest stays allowed everywhere: Reduce
+  Motion, Low Power Mode and `isWaiting` rest on any anchor as before. Pins ignore the list.
+  `PodiumStep().figureAnchor("podium", actions: [.celebrate])` celebrates on the podium and
+  nowhere else.
+- Added: `peekingFigure(isEnabled:style:isWaiting:loops:actions:)` takes the same list for its
+  single card.
+- Added: opt-in actions. `FigureCharacterAction(..., optIn: true)` (`isOptIn`) marks an action
+  of a custom character that plays only on anchors that list it, never at random elsewhere.
+- Changed: the celebration (`celebrate`) is opt-in. It is no longer part of the top's random
+  repertoire: it plays only on anchors that list it (`actions: [.celebrate]`). Pins of
+  `FigurePose.celebrate` work as before. `HumanFigure.actions(at:)` still lists it, with
+  `isOptIn` set.
+- Changed: when the stage picks where to come out for an action it prefers a card edge that
+  has an action to play there over one that has none. With the default repertoire every edge
+  the figure fits at has one, so nothing changes there.
+
 ## 0.5.0 - 2026-11-20
 
 - Added: a celebration on the top edge (`celebrate`), like a winner on the podium. The figure

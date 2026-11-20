@@ -1556,9 +1556,14 @@ enum FigurePlacement {
     }
 }
 
-/// The actions an edge plays, drawn at random each cycle.
+/// The actions an edge plays, drawn at random each cycle (opt-in ones only
+/// on anchors that list them).
 enum FigureRepertoire {
-    /// Actions on the top edge.
+    /// Actions played only on anchors that list them
+    /// (`figureAnchor(_:edges:actions:)`), never drawn at random elsewhere.
+    static let optIn: Set<FigureAction> = [.celebrate]
+
+    /// Actions on the top edge, opt-in ones included.
     static let top: [FigureAction] = [
         .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate,
     ]
@@ -1707,7 +1712,8 @@ enum FigureAnchorPicker {
     }
 
     /// Where the figure comes out next, among the allowed, eligible edges of
-    /// the anchors, preferring in turn: a place that `offersFresh` (it can
+    /// the anchors, preferring in turn: a place that `offersAny` (it has an
+    /// action to play there, nil = any), a place that `offersFresh` (it can
     /// play something other than the last action — nil = any), another
     /// anchor than `current`, another edge than `currentEdge` of the same
     /// anchor. Among what is left an edge is drawn by `FigureEdge.weight`,
@@ -1719,6 +1725,7 @@ enum FigureAnchorPicker {
         candidates: [(id: ID, rect: CGRect, edges: FigureEdges)], viewport: CGRect?,
         viewportFor: ((ID) -> CGRect?)? = nil,
         sizes: FigureSizes, allowed: FigureEdges = .all,
+        offersAny: ((_ id: ID, _ rect: CGRect, _ edge: FigureEdge) -> Bool)? = nil,
         offersFresh: ((_ id: ID, _ rect: CGRect, _ edge: FigureEdge) -> Bool)? = nil,
         using generator: inout some RandomNumberGenerator
     ) -> (id: ID, edge: FigureEdge)? {
@@ -1739,7 +1746,8 @@ enum FigureAnchorPicker {
             let kept = pool.filter(keep)
             return kept.isEmpty ? pool : kept
         }
-        var pool = preferring(pairs) { offersFresh?($0.id, $0.rect, $0.edge) ?? true }
+        var pool = preferring(pairs) { offersAny?($0.id, $0.rect, $0.edge) ?? true }
+        pool = preferring(pool) { offersFresh?($0.id, $0.rect, $0.edge) ?? true }
         pool = preferring(pool) { $0.id != current }
         pool = preferring(pool) { $0.id != current || $0.edge != currentEdge }
         let edges = FigureEdge.allCases.filter { edge in pool.contains { $0.edge == edge } }
