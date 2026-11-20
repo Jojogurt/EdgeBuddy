@@ -16,6 +16,7 @@ struct PeekingFigureTests {
         (.wormWalk, 4.48),
         (.handstand, 4.16),
         (.run, 3.16),
+        (.celebrate, 2.78),
     ])
     func actionDurations(action: FigureAction, expected: Double) {
         let played = FigureTimeline(action: action, entrance: nil, reduceMotion: false)
@@ -25,7 +26,7 @@ struct PeekingFigureTests {
     }
 
     @Test("Every action starts and ends at rest", arguments: [
-        FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run,
+        FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate,
     ])
     func endsAtRest(action: FigureAction) {
         let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false)
@@ -308,7 +309,7 @@ struct PeekingFigureTests {
 
     @Test("Repeat count changes the action's beats", arguments: [
         (FigureAction.wave, 0.4), (.jumpingJacks, 0.6), (.march, 0.8), (.wormWalk, 0.76), (.handstand, 0.64),
-        (.run, 0.66), (.rest, 0.48), (.sideStretch, 2.9),
+        (.run, 0.66), (.rest, 0.48), (.sideStretch, 2.9), (.celebrate, 0.38),
     ])
     func repeatCount(action: FigureAction, beat: Double) {
         func length(_ repeats: Int) -> Double {
@@ -323,7 +324,7 @@ struct PeekingFigureTests {
     @Test("Random variation stays inside its ranges")
     func randomVariation() {
         var generator = SystemRandomNumberGenerator()
-        for action in [FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run] {
+        for action in [FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate] {
             for _ in 0..<50 {
                 let v = FigureVariation.random(for: action, exit: .spring, using: &generator)
                 #expect(FigureVariation.holdBeforeRange.contains(v.holdBefore))
@@ -921,8 +922,8 @@ struct PeekingFigureTests {
         #expect(FigureRepertoire.actions(for: .top, room: 1000) == FigureRepertoire.top)
     }
 
-    @Test("Worm walk and handstand stay inside the top's box, never below the edge", arguments: [
-        FigureAction.wormWalk, .handstand,
+    @Test("Worm walk, handstand and celebration stay inside the top's box, never below the edge", arguments: [
+        FigureAction.wormWalk, .handstand, .celebrate,
     ])
     func topFloorWorkInBox(action: FigureAction) {
         for repeats in FigureVariation.repeatRange(action) {

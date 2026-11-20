@@ -14,7 +14,8 @@ somewhere else:
 
 - **top edge** - stands on it: rests, waves, does jumping jacks, stretches,
   marches, inches along it like a caterpillar (worm walk), cartwheels into a
-  handstand or runs along the edge;
+  handstand, runs along the edge or celebrates like a winner on the podium
+  (hops with both arms up in a V);
 - **bottom edge** - hangs under it (wide grip): swings like a pendulum, pulls
   itself up;
 - **leading / trailing edge** - reaches around the card's edge and plays
@@ -291,7 +292,7 @@ once, without the entrance — the steadiest choice for snapshots — and `spot`
 (0…1, default 0.5) to move it along the edge.
 
 `FigurePose` lists the poses with a clear still frame: `.rest` (top and
-bottom), `.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand` (top),
+bottom), `.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand`, `.celebrate` (top),
 `.swing`, `.pullUp` (bottom), `.flag` (sides). A pose pinned at the top or
 the bottom where it isn't played rests there. A side only plays the flag:
 any other pose pinned at a side (`.rest` included) plays on the top of the

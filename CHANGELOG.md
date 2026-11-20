@@ -6,6 +6,11 @@ change in minor releases.
 
 ## Unreleased
 
+- Added: a celebration on the top edge (`celebrate`), like a winner on the podium. The figure
+  crouches, springs up with both arms in a V, hops on the spot two to four times, then stands
+  tall with the arms up, nods side to side and brings them down. It is part of the top's
+  random repertoire and can be pinned as `FigurePose.celebrate` (held standing in the V).
+
 - Changed: the human figure no longer has a rest pose at a side. The pose leaning out from
   behind the card's edge is gone from everything it can show. At a side it only does the flag
   and the climb, always coming out hands first straight into the action and going back the

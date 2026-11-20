@@ -20,6 +20,8 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     case march
     /// Top: balanced on its hands, legs up.
     case handstand
+    /// Top: standing tall with both arms up in a V, a winner on the podium.
+    case celebrate
     /// Bottom: swung out to one side, hanging by its hands.
     case swing
     /// Bottom: pulled up, the head at the edge.
@@ -31,7 +33,7 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     public var edges: FigureEdges {
         switch self {
         case .rest: [.top, .bottom]
-        case .wave, .jumpingJacks, .sideStretch, .march, .handstand: .top
+        case .wave, .jumpingJacks, .sideStretch, .march, .handstand, .celebrate: .top
         case .swing, .pullUp: .bottom
         case .flag: [.leading, .trailing]
         }
@@ -56,6 +58,7 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
         case .sideStretch: .sideStretch
         case .march: .march
         case .handstand: .handstand
+        case .celebrate: .celebrate
         case .swing: .swing
         case .pullUp: .pullUp
         case .flag: .flag

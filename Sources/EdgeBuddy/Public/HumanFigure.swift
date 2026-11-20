@@ -14,9 +14,9 @@ public enum FigureHead: Sendable {
 }
 
 /// The built-in figure: a stick figure with a skeleton, two-bone IK and the
-/// whole repertoire — waves, jumping jacks, a worm walk and a handstand on
-/// the top, swings and pull-ups under the bottom, flags and climbs at
-/// the sides — with the climb or spring entrance of `FigureStyle`.
+/// whole repertoire — waves, jumping jacks, a worm walk, a handstand and a
+/// winner's celebration on the top, swings and pull-ups under the bottom,
+/// flags and climbs at the sides — with the climb or spring entrance of `FigureStyle`.
 ///
 /// It is the default character. Set it with `figureCharacter(_:)` to tune
 /// its look — the head, the thickness of head, limbs and torso, a colour

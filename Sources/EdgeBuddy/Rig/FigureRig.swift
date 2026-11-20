@@ -22,6 +22,10 @@ enum FigureAction: CaseIterable, Equatable, Sendable {
     /// Turns sideways and runs along the card's edge to another spot — the
     /// loader's run cycle (`FigureJoints.run(phase:)`), the same rig in profile.
     case run
+    /// A winner on the podium: crouches, springs up with both arms in a V,
+    /// hops on the spot, then stands tall with the arms up and nods side to
+    /// side before they come down.
+    case celebrate
     /// Bottom edge: swings on its hands like a pendulum, legs trailing.
     case swing
     /// Bottom edge: pulls itself up until the head reaches the edge.
@@ -100,6 +104,7 @@ struct FigureVariation: Equatable, Sendable {
         case .run: 3...5
         case .swing, .flag, .climb: 2...4
         case .pullUp: 1...3
+        case .celebrate: 2...4
         }
     }
 
@@ -691,6 +696,40 @@ enum FigureEdgePoses {
         .placing(armL: handstandGripL, armR: handstandGripR)
     static let handstandWobbleR = handstand.with { $0.lean = 185; $0.legL = -179; $0.legR = -190 }
         .placing(armL: handstandGripL, armR: handstandGripR)
+
+    /// `pose` lowered so its bent legs still end on the edge like the rest's
+    /// (the legs mirror each other; the `L` one sets the drop).
+    static func planted(_ pose: FigureJoints) -> FigureJoints {
+        func reach(_ leg: Double, _ knee: Double) -> Double {
+            let radians = Double.pi / 180
+            return FigureSkeleton.thigh * cos(leg * radians) + FigureSkeleton.shin * cos((leg + knee) * radians)
+        }
+        return pose.with { $0.y = reach(rest.legL, rest.kneeL) - reach(pose.legL, pose.kneeL) }
+    }
+
+    /// Winding up for the celebration's jump: knees bent out, arms swung down.
+    static let celebrateCrouch = planted(rest.with {
+        $0.armL = -28; $0.elbowL = 18; $0.armR = 28; $0.elbowR = -18
+        $0.legL = -30; $0.kneeL = 44; $0.legR = 30; $0.kneeR = -44
+    })
+    /// Standing tall, both arms up in a V: the winner on the podium (the
+    /// celebration's hold frame).
+    static let celebrateVictory = planted(rest.with {
+        $0.armL = -146; $0.elbowL = 10; $0.armR = 146; $0.elbowR = -10; $0.legL = -8; $0.legR = 8
+    })
+    /// The top of a hop: arms stretched higher, knees tucked a little.
+    static let celebrateAir = celebrateVictory.with {
+        $0.armL = -154; $0.elbowL = -2; $0.armR = 154; $0.elbowR = 2
+        $0.legL = -14; $0.kneeL = 24; $0.legR = 14; $0.kneeR = -24
+        $0.y = -13
+    }
+    /// Landing in the V, the knees giving a little.
+    static let celebrateLand = planted(celebrateVictory.with {
+        $0.armL = -140; $0.elbowL = 16; $0.armR = 140; $0.elbowR = -16
+        $0.legL = -20; $0.kneeL = 30; $0.legR = 20; $0.kneeR = -30
+    })
+    /// Feet planted on the edge while the knees bend or straighten.
+    static let celebratePlant = LimbPaths(legL: LimbPath(bend: 1), legR: LimbPath(bend: -1))
 }
 
 /// One played sequence: optional entrance, then the action, ending at rest.
@@ -1071,6 +1110,21 @@ struct FigureTimeline: Equatable, Sendable {
             }
             walk = runStart...time
             at(0.3, rest)
+        case .celebrate:
+            // Crouch, spring up into the V and hop on the spot, landing with
+            // the knees giving; then stand tall in the V (the podium), nod
+            // side to side and bring the arms down.
+            at(0.24, poses.celebrateCrouch, limbs: poses.celebratePlant)
+            for _ in 0..<repeats {
+                at(0.2, poses.celebrateAir, .outCubic)
+                at(0.18, poses.celebrateLand, .in)
+            }
+            at(0.22, poses.celebrateVictory, limbs: poses.celebratePlant)
+            signature = time
+            at(0.28, poses.celebrateVictory.with { $0.tilt = -8 })
+            at(0.28, poses.celebrateVictory.with { $0.tilt = 8 })
+            at(0.2, poses.celebrateVictory)
+            at(0.42, rest)
         }
         if let exit = variation.exit {
             hold(variation.holdAfter, stance)
@@ -1099,7 +1153,7 @@ struct FigureTimeline: Equatable, Sendable {
         switch action {
         case .rest, .sideStretch: 1
         case .swing, .pullUp, .handstand: 2
-        case .wave, .jumpingJacks, .march, .flag, .climb, .wormWalk: 3
+        case .wave, .jumpingJacks, .march, .flag, .climb, .wormWalk, .celebrate: 3
         case .run: runCycles
         }
     }
@@ -1483,7 +1537,9 @@ enum FigurePlacement {
 /// The actions an edge plays, drawn at random each cycle.
 enum FigureRepertoire {
     /// Actions on the top edge.
-    static let top: [FigureAction] = [.wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run]
+    static let top: [FigureAction] = [
+        .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate,
+    ]
     /// Actions hanging under the bottom edge.
     static let bottom: [FigureAction] = [.swing, .pullUp]
     /// Actions at a side edge.
