@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
-## Unreleased
+## 0.5.0 - 2026-11-20
 
 - Added: a celebration on the top edge (`celebrate`), like a winner on the podium. The figure
   crouches, springs up with both arms in a V, hops on the spot two to four times, then stands
