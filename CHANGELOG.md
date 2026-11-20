@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## 0.6.1 - 2026-11-20
+
+- Fixed: a pin (`figurePinned(_:)`) whose anchor was laid out off screen and then scrolled into
+  view without a scroll gesture (`ScrollViewProxy.scrollTo`) never showed: the stage retried a
+  pin only when the anchors or the viewports changed, not when the anchor's frame moved. It now
+  takes the pin up as soon as its card fits, as documented.
+
 ## 0.6.0 - 2026-11-20
 
 - Added: per-anchor actions. `figureAnchor(_:edges:actions:)` takes the actions the figure may
@@ -29,10 +36,6 @@ change in minor releases.
 - Changed: when the stage picks where to come out for an action it prefers a card edge that
   has an action to play there over one that has none. With the default repertoire every edge
   the figure fits at has one, so nothing changes there.
-- Fixed: a pin (`figurePinned(_:)`) whose anchor was laid out off screen and then scrolled into
-  view without a scroll gesture (`ScrollViewProxy.scrollTo`) never showed: the stage retried a
-  pin only when the anchors or the viewports changed, not when the anchor's frame moved. It now
-  takes the pin up as soon as its card fits, as documented.
 
 ## 0.5.0 - 2026-11-20
 
