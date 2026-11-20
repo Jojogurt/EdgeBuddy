@@ -211,6 +211,17 @@ struct FigurePinnedPlay: Equatable {
     /// Seconds from the start where it freezes.
     let holdTime: Double
 
+    /// What a pin that is not showing yet waits on: its anchor's frame, so
+    /// the stage tries again whenever that card moves. A pin laid out off
+    /// screen then shows as soon as its card is scrolled into view — also by
+    /// a programmatic scroll, which moves the frames without a scroll phase
+    /// and without changing the anchors or the viewports. nil = nothing to
+    /// wait for: no pin, the pin already showing, or its anchor not there.
+    static func pendingFrame(_ pin: FigurePin?, isShowing: Bool, anchors: [FigureAnchorFrame]) -> CGRect? {
+        guard let pin, !isShowing else { return nil }
+        return anchors.first { $0.id == pin.anchor }?.rect
+    }
+
     /// The pin's anchor and edge when that anchor is among `anchors` and the
     /// figure fits there and shows whole (`FigureAnchorPicker.isEligible`);
     /// nil = fall back to the free stage. At a side where the character has

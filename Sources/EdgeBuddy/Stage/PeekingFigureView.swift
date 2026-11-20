@@ -195,6 +195,11 @@ struct PeekingFigureView: View {
                 comeOut()
             }
         }
+        // A pin waiting to fit tries again whenever its card moves (scrolled
+        // into view): neither the anchors nor the viewports change then.
+        .onChange(of: pendingPinFrame) { _, frame in
+            if frame != nil, !isPinned, pin != nil { _ = showPin() }
+        }
         .onChange(of: viewportSignature) {
             // Laid out for real (the first pass can be empty), or resized.
             // Not when the scroll changed it (a large title collapsing): the
@@ -319,6 +324,13 @@ struct PeekingFigureView: View {
         isPending = false
         playID += 1
         appear()
+    }
+
+    /// The pinned anchor's frame while the pin waits to fit; nil once it
+    /// shows (`FigurePinnedPlay.pendingFrame`), so a shown pin costs nothing
+    /// per scroll frame.
+    private var pendingPinFrame: CGRect? {
+        FigurePinnedPlay.pendingFrame(pin, isShowing: isPinned, anchors: anchors)
     }
 
     /// Changes whenever the anchors' ids (or their order) do — not their

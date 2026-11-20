@@ -107,6 +107,50 @@ struct FigurePinTests {
         #expect(resolve(FigurePin(anchor: "row", edge: .trailing, pose: .flag), anchors: short) == nil)
     }
 
+    @Test("A pin waiting to fit watches its anchor's frame; nothing once it shows or without its anchor")
+    func pendingFrame() {
+        let pin = FigurePin(anchor: "stats", pose: .wave)
+        #expect(FigurePinnedPlay.pendingFrame(pin, isShowing: false, anchors: anchors) == anchors[1].rect)
+        #expect(FigurePinnedPlay.pendingFrame(pin, isShowing: true, anchors: anchors) == nil)
+        #expect(FigurePinnedPlay.pendingFrame(nil, isShowing: false, anchors: anchors) == nil)
+        #expect(FigurePinnedPlay.pendingFrame(FigurePin(anchor: "missing", pose: .wave), isShowing: false, anchors: anchors) == nil)
+    }
+
+    @Test("A pin laid out below the screen shows once a scroll brings its card in")
+    func pinAfterScroll() throws {
+        // A programmatic scroll moves only the frame: same ids, same viewport.
+        // The stage retries on the frame's change (`pendingFrame`), so the
+        // resolve must succeed on the moved frame alone.
+        let pin = FigurePin(anchor: "step", pose: .celebrate, animated: false)
+        let before = [FigureAnchorFrame(id: AnyHashable("step"), edges: .top, rect: CGRect(x: 105, y: 885, width: 108, height: 92))]
+        let after = [FigureAnchorFrame(id: AnyHashable("step"), edges: .top, rect: CGRect(x: 105, y: 352, width: 108, height: 92))]
+        #expect(resolve(pin, anchors: before) == nil)
+        #expect(FigurePinnedPlay.pendingFrame(pin, isShowing: false, anchors: before)
+            != FigurePinnedPlay.pendingFrame(pin, isShowing: false, anchors: after))
+        let play = try #require(resolve(pin, anchors: after))
+        #expect(play.edge == .top)
+        #expect(play.action == FigurePose.celebrate.name)
+    }
+
+    @Test("A strip exactly the minimum width, shifted past a narrow step, fits and centres the figure", arguments: [
+        // Screen width, the strip's minX (step's minX - 34) in a three-column podium.
+        (CGFloat(393), CGFloat(105)), (375, 99),
+    ])
+    func minimumWidthStrip(screen: CGFloat, stripX: CGFloat) throws {
+        let width = metrics.minimumAnchorWidth
+        #expect(width == 108)
+        let strip = [FigureAnchorFrame(id: AnyHashable("step"), edges: .top, rect: CGRect(x: stripX, y: 300, width: width, height: 92))]
+        let play = try #require(FigurePinnedPlay.resolve(
+            FigurePin(anchor: "step", pose: .celebrate), anchors: strip,
+            viewport: CGRect(x: 0, y: 0, width: screen, height: 600), metrics: metrics, style: style
+        ))
+        #expect(play.action == FigurePose.celebrate.name)
+        // No room to travel: whatever the spot, the box sits between both
+        // margins, its centre 54 pt in from the strip's minX.
+        #expect(metrics.travelSpan(at: .top, on: strip[0].rect) == 0)
+        #expect(metrics.edgeMargin + metrics.width / 2 == 54)
+    }
+
     @Test("Unbounded stage (a single card) takes any anchor that is wide enough")
     func unbounded() throws {
         let solo = [FigureAnchorFrame(id: AnyHashable(7), edges: .top, rect: CGRect(x: 0, y: -500, width: 300, height: 120))]
