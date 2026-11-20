@@ -4,15 +4,16 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
-## Unreleased
+## 0.7.0 - 2026-11-20
 
 - Added: two more opt-in celebrations on the top edge. `.champagne`: a bottle pops into the
   figure's hand and is shaken hard until it goes off to the right (the cork flies, a burst of
   foam and drops, the spray dying down), then shaken again and off to the left; a swig, and the
   bottle is gone. `.flex`: a bodybuilder's routine, each pose hit and squeezed: front double
-  biceps, most muscular, side chest, one biceps with the other arm down, abs and thigh. List them on an anchor like
-  `.celebrate` (`figureAnchor("podium", actions: [.champagne, .flex])`); pin them with
-  `FigurePose.champagne` (going off to the right) and `FigurePose.flex` (the double biceps).
+  biceps, most muscular, side chest, one biceps with the other arm down, abs and thigh. List
+  them on an anchor like `.celebrate` (`figureAnchor("podium", actions: [.champagne, .flex])`);
+  pin them with `FigurePose.champagne` (going off to the right) and `FigurePose.flex` (the
+  double biceps).
 
 ## 0.6.1 - 2026-11-20
 
