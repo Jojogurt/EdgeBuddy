@@ -26,6 +26,14 @@ enum FigureAction: CaseIterable, Equatable, Sendable {
     /// hops on the spot, then stands tall with the arms up and nods side to
     /// side before they come down.
     case celebrate
+    /// A winner with champagne: a bottle pops into the hand, is shaken hard
+    /// and goes off to the right (a cork, a burst of spray), shaken again
+    /// and goes off to the left (`ChampagneSpray`); a swig, and it is gone.
+    case champagne
+    /// A bodybuilder on stage: a front double biceps, then most muscular,
+    /// a side chest, one biceps (the other arm down) and abs and thigh,
+    /// each squeezed.
+    case flex
     /// Bottom edge: swings on its hands like a pendulum, legs trailing.
     case swing
     /// Bottom edge: pulls itself up until the head reaches the edge.
@@ -105,6 +113,7 @@ struct FigureVariation: Equatable, Sendable {
         case .swing, .flag, .climb: 2...4
         case .pullUp: 1...3
         case .celebrate: 2...4
+        case .champagne, .flex: 1...2
         }
     }
 
@@ -233,6 +242,16 @@ struct FigureJoints: Equatable, Sendable {
     var facing: Double = 1
     /// Body offset in grid units (+ = right) — the side and bottom edges.
     var x: Double = 0
+    /// The champagne bottle in the `R` hand: 0 = none, 1 = full size
+    /// (it grows in and shrinks away with the blend).
+    var bottle: Double = 0
+    /// Where the bottle's neck points, an absolute angle like the joints'
+    /// (180 = up), mirrored with `facing`.
+    var bottleAngle: Double = 180
+    /// How hard the bottle sprays, 0…1 (`ChampagneSpray`).
+    var spray: Double = 0
+    /// Biceps bulging on both upper arms, 0 = none, 1 = flexed.
+    var flex: Double = 0
 
     /// Opacity of the far arm and leg in profile (canvas `S_loadery`).
     static let farLimbOpacity = 0.45
@@ -276,7 +295,9 @@ struct FigureJoints: Equatable, Sendable {
             legL: mix(legL, other.legL), kneeL: mix(kneeL, other.kneeL),
             legR: mix(legR, other.legR), kneeR: mix(kneeR, other.kneeR),
             lean: mix(lean, other.lean), y: mix(y, other.y), tilt: mix(tilt, other.tilt),
-            profile: mix(profile, other.profile), facing: mix(facing, other.facing), x: mix(x, other.x)
+            profile: mix(profile, other.profile), facing: mix(facing, other.facing), x: mix(x, other.x),
+            bottle: mix(bottle, other.bottle), bottleAngle: mix(bottleAngle, other.bottleAngle),
+            spray: mix(spray, other.spray), flex: mix(flex, other.flex)
         )
     }
 }
@@ -752,6 +773,108 @@ enum FigureEdgePoses {
     })
     /// Feet planted on the edge while the knees bend or straighten.
     static let celebratePlant = LimbPaths(legL: LimbPath(bend: 1), legR: LimbPath(bend: -1))
+
+    /// The bottle has popped into the `R` hand, held up in front of the
+    /// chest, the head turned to it.
+    static let champagneShow = rest.with {
+        $0.armR = 25; $0.elbowR = 125; $0.bottle = 1; $0.bottleAngle = 180; $0.tilt = 5
+    }
+    /// Shaking it hard, the thumb on the mouth: up…
+    static let champagneShakeUp = champagneShow.with {
+        $0.armR = 2; $0.elbowR = 168; $0.bottleAngle = 160; $0.tilt = 0; $0.lean = -3
+    }
+    /// …and down.
+    static let champagneShakeDown = champagneShow.with {
+        $0.armR = 44; $0.elbowR = 86; $0.bottleAngle = 202; $0.tilt = 9; $0.lean = 3
+    }
+    /// It goes off to the right: the bottle thrust up by the head, tipped to
+    /// the right, the other fist up (the champagne's hold frame).
+    static let champagneRight = rest.with {
+        $0.bottle = 1; $0.bottleAngle = 155; $0.spray = 1
+        $0.armL = -132; $0.elbowL = -22; $0.lean = 3; $0.tilt = 5; $0.elbowR = 60
+    }.placing(.armR, at: CGPoint(x: 70, y: 42), bend: 1)
+    /// Aiming right just before it goes off: pulled in by the shoulder,
+    /// the head turned away a little.
+    static let champagneAimRight = champagneRight.with { $0.spray = 0; $0.tilt = -3; $0.lean = -2 }
+        .placing(.armR, at: CGPoint(x: 63, y: 49), bend: 1)
+    /// It goes off to the left: the arm thrust up across the chest, the
+    /// other hand on the hip.
+    static let champagneLeft = rest.with {
+        $0.bottle = 1; $0.bottleAngle = 205; $0.spray = 1
+        $0.lean = -3; $0.tilt = -6; $0.armR = -40; $0.elbowR = -90
+    }.placing(.armR, at: CGPoint(x: 30, y: 43), bend: -1)
+    /// Aiming left just before it goes off.
+    static let champagneAimLeft = champagneLeft.with { $0.spray = 0; $0.tilt = 3; $0.lean = 2 }
+        .placing(.armR, at: CGPoint(x: 38, y: 50), bend: -1)
+    /// A swig: the bottle's mouth at the mouth, tipped up.
+    static let champagneSwig: FigureJoints = {
+        let base = rest.with { $0.bottle = 1; $0.bottleAngle = 300; $0.tilt = 7; $0.elbowR = 100 }
+        let head = FigureSkeleton(base).head
+        let radians = base.bottleAngle * .pi / 180
+        let mouth = CGPoint(x: head.x + 2.5, y: head.y + 3.5)
+        let hand = CGPoint(
+            x: mouth.x - FigureBottle.mouth * sin(radians), y: mouth.y - FigureBottle.mouth * cos(radians)
+        )
+        return base.placing(.armR, at: hand, bend: 1)
+    }()
+
+    /// Front double biceps: fists by the ears, feet apart (the flex's hold
+    /// frame).
+    static let flexDoubleBiceps = planted(rest.with {
+        $0.armL = -100; $0.elbowL = -86; $0.armR = 100; $0.elbowR = 86
+        $0.legL = -13; $0.legR = 13; $0.flex = 1
+    })
+    /// Most muscular: hunched over bent knees, the fists together in front
+    /// of the belly, elbows out.
+    static let flexMostMuscular: FigureJoints = {
+        let base = planted(rest.with {
+            $0.armL = -40; $0.elbowL = 100; $0.armR = 40; $0.elbowR = -100
+            $0.legL = -18; $0.kneeL = 26; $0.legR = 18; $0.kneeR = -26; $0.flex = 1.2
+        })
+        let hip = FigureSkeleton(base).hip
+        return base.placing(
+            armL: CGPoint(x: hip.x - 2.5, y: hip.y - 9), armR: CGPoint(x: hip.x + 2.5, y: hip.y - 9)
+        )
+    }()
+    /// Side chest, in profile facing right (`facing` -1: left): chest up,
+    /// the near arm bent level in front, the far hand on its wrist, the
+    /// front foot up on its toes.
+    static func flexSideChest(facing: Double) -> FigureJoints {
+        let base = planted(rest.with {
+            $0.profile = 1; $0.facing = facing; $0.lean = -3; $0.tilt = 4
+            $0.armR = 12; $0.elbowR = 84; $0.armL = 30; $0.elbowL = 60
+            $0.legL = -8; $0.legR = 16; $0.kneeR = -30; $0.flex = 1.2
+        })
+        let wrist = FigureSkeleton(base).end(of: .armR)
+        return base.placing(.armL, at: CGPoint(x: wrist.x - 3 * facing, y: wrist.y + 1))
+    }
+    /// One biceps: the left arm up and out, flexed, the right arm straight
+    /// down by the side.
+    static let flexOneArm = planted(rest.with {
+        $0.armL = -110; $0.elbowL = -80; $0.armR = 18; $0.elbowR = 4
+        $0.legL = -10; $0.legR = 10; $0.lean = -2; $0.tilt = 2; $0.flex = 1.1
+    })
+    /// Abdominals and thigh: hands behind the head, elbows up and out, one
+    /// leg out in front.
+    static let flexAbs: FigureJoints = {
+        let base = planted(rest.with {
+            $0.armL = -150; $0.elbowL = -110; $0.armR = 150; $0.elbowR = 110
+            $0.legL = -4; $0.legR = 20; $0.kneeR = -8; $0.flex = 0.7; $0.tilt = 3
+        })
+        let head = FigureSkeleton(base).head
+        return base.placing(
+            armL: CGPoint(x: head.x - 8, y: head.y), armR: CGPoint(x: head.x + 8, y: head.y)
+        )
+    }()
+    /// `pose` squeezed hard: the muscles bulge more, the body sinks a hair.
+    static func squeezed(_ pose: FigureJoints) -> FigureJoints {
+        pose.with { $0.flex += 0.35; $0.tilt += pose.tilt >= 0 ? 2 : -2 }
+    }
+    /// Between two poses the elbows often bend the other way: the arms drop
+    /// by the sides first (as on stage), so they never stick out straight.
+    static let flexArmsDown = planted(rest.with {
+        $0.armL = -24; $0.elbowL = -6; $0.armR = 24; $0.elbowR = 6; $0.legL = -10; $0.legR = 10
+    })
 }
 
 /// One played sequence: optional entrance, then the action, ending at rest.
@@ -835,6 +958,14 @@ struct FigureTimeline: Equatable, Sendable {
     /// run).
     let holdTime: Double?
 
+    /// While the champagne sprays (`FigureJoints.spray` above 0), seconds
+    /// from the start; nil = it never does. Drops still fly for
+    /// `ChampagneSpray.life` after it.
+    let sprayWindow: ClosedRange<Double>?
+    /// When the champagne goes off (a burst at each, a cork at the first),
+    /// seconds from the start, inside `sprayWindow`; empty = never.
+    let sprayBursts: [Double]
+
     /// How far below the rig's own ground line (grid y 84) the card's edge
     /// sits for the peeking figure (`FigureSkeleton.edgeY`): poses "behind
     /// the card" are this much lower, so the standing feet end on the edge.
@@ -913,6 +1044,8 @@ struct FigureTimeline: Equatable, Sendable {
         let repeats = variation.repeats ?? Self.canvasRepeats(action)
         var walk: ClosedRange<Double>?
         var signature: Double?
+        var spray: ClosedRange<Double>?
+        var bursts: [Double] = []
 
         if reduceMotion {
             frames.append(Keyframe(time: 0, joints: rest, easing: .inOut))
@@ -925,6 +1058,8 @@ struct FigureTimeline: Equatable, Sendable {
             walkDistance = nil
             hiddenPause = nil
             holdTime = nil
+            sprayWindow = nil
+            sprayBursts = []
             return
         }
 
@@ -1147,6 +1282,68 @@ struct FigureTimeline: Equatable, Sendable {
             at(0.28, poses.celebrateVictory.with { $0.tilt = 8 })
             at(0.2, poses.celebrateVictory)
             at(0.42, rest)
+        case .champagne:
+            // The bottle pops into the hand. Per repeat it is shaken hard and
+            // goes off to the right (a cork, a burst, the spray dying down),
+            // then shaken again and goes off to the left. A swig, and it is
+            // gone.
+            at(0.34, poses.champagneShow, .out)
+            at(0.12, poses.champagneShow)
+            var sprayStart: Double?
+            for _ in 0..<repeats {
+                for (aim, burst) in [
+                    (poses.champagneAimRight, poses.champagneRight), (poses.champagneAimLeft, poses.champagneLeft),
+                ] {
+                    for _ in 0..<3 {
+                        at(0.075, poses.champagneShakeUp)
+                        at(0.075, poses.champagneShakeDown)
+                    }
+                    at(0.2, aim)
+                    if sprayStart == nil { sprayStart = time }
+                    at(0.09, burst, .out)
+                    bursts.append(time)
+                    at(0.3, burst)
+                    if signature == nil { signature = time }
+                    at(0.35, burst.with { $0.spray = 0.4 })
+                    at(0.3, burst.with { $0.spray = 0 })
+                    spray = (sprayStart ?? time)...time
+                    at(0.24, poses.champagneShow)
+                }
+            }
+            at(0.36, poses.champagneSwig)
+            at(0.42, poses.champagneSwig.with { $0.tilt = 11 })
+            at(0.45, rest)
+        case .flex:
+            // Into a front double biceps, then through the bodybuilder's
+            // poses, each hit and squeezed: most muscular, a side chest
+            // (turned right, the left on a second round), one biceps up,
+            // abs and thigh. A last double biceps and the arms come down.
+            // Each pose is hit from the arms down. Facing left, the arms
+            // down are seen mirrored (the same drawing), so turning never
+            // squashes the figure flat.
+            var facing = 1.0
+            func down() -> FigureJoints { facing < 0 ? poses.flexArmsDown.flippedFacing : poses.flexArmsDown }
+            func hit(_ pose: FigureJoints, first: Bool = false) {
+                at(first ? 0.2 : 0.16, down(), limbs: poses.celebratePlant)
+                if pose.facing != facing {
+                    facing = pose.facing
+                    at(0, down())
+                }
+                at(0.3, pose, .out, limbs: poses.celebratePlant)
+                if first { signature = time }
+                at(0.14, poses.squeezed(pose))
+                at(0.28, poses.squeezed(pose))
+            }
+            hit(poses.flexDoubleBiceps, first: true)
+            for round in 0..<repeats {
+                hit(poses.flexMostMuscular)
+                hit(poses.flexSideChest(facing: round.isMultiple(of: 2) ? 1 : -1))
+                hit(poses.flexOneArm)
+                hit(poses.flexAbs)
+            }
+            hit(poses.flexDoubleBiceps)
+            at(0.2, down(), limbs: poses.celebratePlant)
+            at(0.3, rest, limbs: poses.celebratePlant)
         }
         if let exit = variation.exit {
             hold(variation.holdAfter, stance)
@@ -1168,12 +1365,14 @@ struct FigureTimeline: Equatable, Sendable {
         }
         walkWindow = walk
         holdTime = signature
+        sprayWindow = spray
+        sprayBursts = bursts
     }
 
     /// Repetitions of an action's beat at the canvas count (`FigureVariation.repeats` nil).
     static func canvasRepeats(_ action: FigureAction) -> Int {
         switch action {
-        case .rest, .sideStretch: 1
+        case .rest, .sideStretch, .champagne, .flex: 1
         case .swing, .pullUp, .handstand: 2
         case .wave, .jumpingJacks, .march, .flag, .climb, .wormWalk, .celebrate: 3
         case .run: runCycles
@@ -1561,11 +1760,11 @@ enum FigurePlacement {
 enum FigureRepertoire {
     /// Actions played only on anchors that list them
     /// (`figureAnchor(_:edges:actions:)`), never drawn at random elsewhere.
-    static let optIn: Set<FigureAction> = [.celebrate]
+    static let optIn: Set<FigureAction> = [.celebrate, .champagne, .flex]
 
     /// Actions on the top edge, opt-in ones included.
     static let top: [FigureAction] = [
-        .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate,
+        .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate, .champagne, .flex,
     ]
     /// Actions hanging under the bottom edge.
     static let bottom: [FigureAction] = [.swing, .pullUp]

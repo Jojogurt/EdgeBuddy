@@ -22,8 +22,13 @@ enum HumanRig {
             frame: { play, time, edge, heading in
                 guard let timeline = play.base as? FigureTimeline else { return nil }
                 let pose = joints(timeline, at: time, edge: edge, heading: heading)
+                let drops = timeline.sprayWindow.map { window in
+                    ChampagneSpray.drops(at: time, window: window, bursts: timeline.sprayBursts) {
+                        joints(timeline, at: $0, edge: edge, heading: heading)
+                    }
+                } ?? []
                 return FigureFrame(isOut: isOut(pose, at: edge)) { context, color in
-                    HumanDrawing.draw(pose, figure: figure, in: &context, color: color)
+                    HumanDrawing.draw(pose, figure: figure, in: &context, color: color, spray: drops)
                 }
             }
         )
@@ -79,9 +84,12 @@ enum HumanRig {
 }
 
 /// Draws one frame of `HumanFigure` in the rig's grid: far limbs (faded in
-/// profile), torso, head, near limbs.
+/// profile), torso, head, the bottle, near limbs, then the spray.
 enum HumanDrawing {
-    static func draw(_ joints: FigureJoints, figure: HumanFigure, in context: inout GraphicsContext, color: Color) {
+    static func draw(
+        _ joints: FigureJoints, figure: HumanFigure, in context: inout GraphicsContext, color: Color,
+        spray: [ChampagneSpray.Drop] = []
+    ) {
         let skeleton = FigureSkeleton(joints)
         func shading(_ part: Color?) -> GraphicsContext.Shading { .color(part ?? color) }
         let limb = StrokeStyle(
@@ -91,9 +99,18 @@ enum HumanDrawing {
             Path { $0.addLines(points) }
         }
 
+        func drawBiceps(_ arm: [CGPoint], in context: inout GraphicsContext) {
+            guard let bump = FigureBiceps.bump(arm, flex: joints.flex, width: limb.lineWidth) else { return }
+            let r = bump.radius
+            context.fill(
+                Path(ellipseIn: CGRect(x: bump.center.x - r, y: bump.center.y - r, width: 2 * r, height: 2 * r)),
+                with: shading(figure.armColor)
+            )
+        }
         func drawFar(_ far: inout GraphicsContext) {
             far.stroke(polyline(skeleton.legL), with: shading(figure.legColor), style: limb)
             far.stroke(polyline(skeleton.armL), with: shading(figure.armColor), style: limb)
+            drawBiceps(skeleton.armL, in: &far)
         }
         if skeleton.farLimbOpacity < 1 {
             // One layer, so the far arm and leg fade as a whole where they cross.
@@ -111,7 +128,31 @@ enum HumanDrawing {
             style: StrokeStyle(lineWidth: FigureSkeleton.torsoWidth * figure.torsoScale, lineCap: .round)
         )
         drawHead(figure, joints: joints, at: skeleton.head, in: &context, color: color)
+        if let bottle = FigureBottle(joints, skeleton: skeleton) {
+            // Under the hand, so the hand holds it.
+            let outline = Path { $0.addLines(bottle.outline); $0.closeSubpath() }
+            context.fill(outline, with: .color(color))
+            context.stroke(outline, with: .color(color), style: StrokeStyle(lineWidth: 0.8, lineJoin: .round))
+        }
         context.stroke(polyline(skeleton.armR), with: shading(figure.armColor), style: limb)
+        drawBiceps(skeleton.armR, in: &context)
+        for drop in spray {
+            let r = drop.radius
+            if let angle = drop.angle {
+                // The cork: a little block tumbling along.
+                let cork = Path(
+                    roundedRect: CGRect(x: -r * 0.7, y: -r, width: r * 1.4, height: 2 * r), cornerRadius: r * 0.3
+                ).applying(
+                    CGAffineTransform(translationX: drop.center.x, y: drop.center.y).rotated(by: -angle)
+                )
+                context.fill(cork, with: .color(color.opacity(drop.opacity)))
+            } else {
+                context.fill(
+                    Path(ellipseIn: CGRect(x: drop.center.x - r, y: drop.center.y - r, width: 2 * r, height: 2 * r)),
+                    with: .color(color.opacity(0.9 * drop.opacity))
+                )
+            }
+        }
     }
 
     private static func drawHead(

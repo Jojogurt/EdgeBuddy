@@ -97,20 +97,23 @@ struct AnchorActionsTests {
     func names() {
         let statics: [FigureActionName] = [
             .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate,
-            .swing, .pullUp, .flag, .climb,
+            .champagne, .flex, .swing, .pullUp, .flag, .climb,
         ]
         #expect(statics.map(\.rawValue) == FigureAction.allCases.filter { $0 != .rest }.map(\.name))
         #expect(FigureActionName.celebrate == "celebrate")
+        #expect(FigureActionName.champagne == "champagne")
+        #expect(FigureActionName.flex == "flex")
         #expect(FigureActionName("float") == FigureActionName(rawValue: "float"))
     }
 
-    @Test("The celebration is the human's only opt-in action, also through the protocol")
+    @Test("The celebrations are the human's only opt-in actions, also through the protocol")
     func humanOptIn() {
-        #expect(FigureRepertoire.optIn == [.celebrate])
-        #expect(human.optInActions == ["celebrate"])
+        let celebrations: Set<String> = ["celebrate", "champagne", "flex"]
+        #expect(FigureRepertoire.optIn == [.celebrate, .champagne, .flex])
+        #expect(human.optInActions == celebrations)
         for edge in FigureEdge.allCases {
             for action in HumanFigure().actions(at: edge) {
-                #expect(action.isOptIn == (action.name == "celebrate"))
+                #expect(action.isOptIn == celebrations.contains(action.name))
             }
         }
         #expect(FigureCharacterAction<CheerBlob.Pose>("x", motion: FigureMotion(duration: 1) { _ in .init(y: 0) })

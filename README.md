@@ -15,7 +15,8 @@ somewhere else:
 - **top edge** - stands on it: rests, waves, does jumping jacks, stretches,
   marches, inches along it like a caterpillar (worm walk), cartwheels into a
   handstand or runs along the edge; on a card that asks for it, celebrates like
-  a winner on the podium (hops with both arms up in a V, see
+  a winner on the podium: hops with both arms up in a V, shakes a bottle of
+  champagne until it goes off to each side, or strikes bodybuilder poses (see
   [Actions per anchor](#actions-per-anchor));
 - **bottom edge** - hangs under it (wide grip): swings like a pendulum, pulls
   itself up;
@@ -149,22 +150,26 @@ it; elsewhere the edge simply plays its other actions. Sizes scale with
 
 `figureAnchor(_:edges:actions:)` also takes the actions the figure may play on
 that anchor. `nil` (the default) is the edge's random repertoire. A list
-(`FigureActionName`: `.wave`, `.march`, `.celebrate`, `.flag`, ...) narrows it
+(`FigureActionName`: `.wave`, `.march`, `.celebrate`, `.champagne`, `.flag`, ...) narrows it
 to those actions, each played at the edges where it belongs (`.celebrate` and
 `.wave` on the top, `.swing` under the bottom, `.flag` at a side):
 
 ```swift
-// The winner's podium step: only the celebration, and only here.
+// The winner's podium step: only the celebrations, and only here.
 PodiumStep(winner)
-    .figureAnchor("podium", actions: [.celebrate])
+    .figureAnchor("podium", actions: [.celebrate, .champagne, .flex])
 
 // Only waves and swings on this card, nothing at its sides.
 HeroCard()
     .figureAnchor("hero", edges: [.top, .bottom], actions: [.wave, .swing])
 ```
 
-- **Opt-in actions.** The celebration (`.celebrate`) is opt-in: it is never
-  drawn at random, only played on anchors that list it. A character of your
+- **Opt-in actions.** The celebrations are opt-in: `.celebrate` (hops with
+  the arms in a V), `.champagne` (a bottle shaken until it goes off with a
+  cork and a burst to the right, shaken again and off to the left, and a swig)
+  and `.flex` (a bodybuilder's routine: double biceps, most muscular, side
+  chest, one biceps, abs and thigh). They are never drawn at random, only played
+  on anchors that list them. A character of your
   own marks such actions with `FigureCharacterAction(..., optIn: true)` and
   names them in the list by name (`actions: ["cheer"]`).
 - An edge with none of the listed actions (or without room for them on
@@ -328,7 +333,7 @@ once, without the entrance — the steadiest choice for snapshots — and `spot`
 (0…1, default 0.5) to move it along the edge.
 
 `FigurePose` lists the poses with a clear still frame: `.rest` (top and
-bottom), `.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand`, `.celebrate` (top),
+bottom), `.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand`, `.celebrate`, `.champagne`, `.flex` (top),
 `.swing`, `.pullUp` (bottom), `.flag` (sides). A pose pinned at the top or
 the bottom where it isn't played rests there. A side only plays the flag:
 any other pose pinned at a side (`.rest` included) plays on the top of the

@@ -7,8 +7,9 @@ A tiny stick figure that lives on the edges of your SwiftUI cards.
 EdgeBuddy adds one small, single-colour figure to a screen. It comes out
 from behind a card you mark, plays a short random action — waves, jumping
 jacks, a stretch, marching, a caterpillar worm walk, a handstand or a run on
-the top edge (plus a winner's celebration, hops with both arms up in a V, on
-anchors that ask for it); hangs,
+the top edge (plus the winner's celebrations on anchors that ask for them:
+hops with both arms up in a V, a shaken bottle of champagne going off to
+each side, a bodybuilder's poses); hangs,
 swings and pulls itself up under the bottom edge;
 beside the sides, outside the card, holding its edge: does a human flag or
 climbs up the edge (where enough of the side is on screen; a side at the
@@ -35,11 +36,12 @@ ScrollView {
 For a single card (onboarding, an empty state) use
 ``SwiftUICore/View/peekingFigure(isEnabled:style:isWaiting:loops:actions:)``.
 
-An anchor can narrow what the figure plays on it. The celebration is opt-in:
-it plays only on anchors that list it.
+An anchor can narrow what the figure plays on it. The celebrations
+(`.celebrate`, `.champagne`, `.flex`) are opt-in: they play only on
+anchors that list them.
 
 ```swift
-PodiumStep(winner).figureAnchor("podium", actions: [.celebrate])
+PodiumStep(winner).figureAnchor("podium", actions: [.celebrate, .champagne, .flex])
 ```
 
 ## Topics

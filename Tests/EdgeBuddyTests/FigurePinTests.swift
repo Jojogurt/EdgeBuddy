@@ -202,7 +202,7 @@ struct FigurePinTests {
         }
     }
 
-    @Test("Top poses hold their signature: arm up, jacks open, bent, knee up, arms in a V")
+    @Test("Top poses hold their signature: arm up, jacks open, bent, knee up, arms in a V, spraying, flexing")
     func topHoldFrames() throws {
         func held(_ pose: FigurePose) throws -> FigureJoints {
             let play = try #require(resolve(FigurePin(anchor: "hero", pose: pose)))
@@ -213,6 +213,8 @@ struct FigurePinTests {
         #expect(try held(.sideStretch).lean == -18)
         #expect(try held(.march).legL == -60)
         #expect(try held(.celebrate) == FigureEdgePoses.celebrateVictory)
+        #expect(try held(.champagne) == FigureEdgePoses.champagneRight)
+        #expect(try held(.flex) == FigureEdgePoses.flexDoubleBiceps)
     }
 
     @Test("Animated pins come out first; still ones skip the entrance")

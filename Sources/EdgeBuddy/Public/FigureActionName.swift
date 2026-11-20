@@ -53,6 +53,14 @@ public struct FigureActionName: RawRepresentable, Hashable, Sendable, Expressibl
     /// Top: a winner on the podium, hops with both arms up in a V. Opt-in:
     /// played only on anchors that list it.
     public static let celebrate = Self(FigureAction.celebrate)
+    /// Top: a bottle of champagne, shaken hard until it goes off to one
+    /// side, then shaken again and off to the other, then a swig. Opt-in:
+    /// played only on anchors that list it.
+    public static let champagne = Self(FigureAction.champagne)
+    /// Top: a bodybuilder going through the poses (double biceps, most
+    /// muscular, side chest, one biceps with the other arm down, abs and thigh). Opt-in: played only
+    /// on anchors that list it.
+    public static let flex = Self(FigureAction.flex)
     /// Bottom: swings on its hands.
     public static let swing = Self(FigureAction.swing)
     /// Bottom: pulls itself up to the edge.

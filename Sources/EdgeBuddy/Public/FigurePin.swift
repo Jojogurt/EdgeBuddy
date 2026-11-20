@@ -24,6 +24,13 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     /// Pinnable anywhere; played freely only on anchors that list it
     /// (`figureAnchor(_:edges:actions:)`).
     case celebrate
+    /// Top: the champagne going off to the right, the bottle up by the
+    /// head, the other fist up. Pinnable anywhere; played freely only
+    /// on anchors that list it.
+    case champagne
+    /// Top: a front double biceps, fists by the ears. Pinnable anywhere;
+    /// played freely only on anchors that list it.
+    case flex
     /// Bottom: swung out to one side, hanging by its hands.
     case swing
     /// Bottom: pulled up, the head at the edge.
@@ -35,7 +42,7 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     public var edges: FigureEdges {
         switch self {
         case .rest: [.top, .bottom]
-        case .wave, .jumpingJacks, .sideStretch, .march, .handstand, .celebrate: .top
+        case .wave, .jumpingJacks, .sideStretch, .march, .handstand, .celebrate, .champagne, .flex: .top
         case .swing, .pullUp: .bottom
         case .flag: [.leading, .trailing]
         }
@@ -61,6 +68,8 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
         case .march: .march
         case .handstand: .handstand
         case .celebrate: .celebrate
+        case .champagne: .champagne
+        case .flex: .flex
         case .swing: .swing
         case .pullUp: .pullUp
         case .flag: .flag

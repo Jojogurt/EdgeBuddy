@@ -14,9 +14,10 @@ public enum FigureHead: Sendable {
 }
 
 /// The built-in figure: a stick figure with a skeleton, two-bone IK and the
-/// whole repertoire — waves, jumping jacks, a worm walk, a handstand and a
-/// winner's celebration (opt-in, see `figureAnchor(_:edges:actions:)`) on
-/// the top, swings and pull-ups under the bottom,
+/// whole repertoire — waves, jumping jacks, a worm walk, a handstand and
+/// three winner's celebrations (hops with the arms in a V, champagne going
+/// off, a bodybuilder's poses; opt-in, see `figureAnchor(_:edges:actions:)`)
+/// on the top, swings and pull-ups under the bottom,
 /// flags and climbs at the sides — with the climb or spring entrance of `FigureStyle`.
 ///
 /// It is the default character. Set it with `figureCharacter(_:)` to tune
@@ -108,8 +109,10 @@ public struct HumanFigure: FigureCharacter {
     /// The repertoire at `edge`, each action as one whole play from the rest
     /// pose back to it; at a side, where it has no rest, from the action's
     /// own held pose back to it (the stage itself plays the rig, with its
-    /// random repeat counts, routes and grips). The celebration is opt-in
-    /// (`isOptIn`): it plays only on anchors that list it.
+    /// random repeat counts, routes and grips). The celebrations are opt-in
+    /// (`isOptIn`): they play only on anchors that list them. The champagne
+    /// spray is drawn by the stage (it needs the drops' past); a pose drawn
+    /// here shows the bottle without it.
     public func actions(at edge: FigureEdge) -> [FigureCharacterAction<Pose>] {
         FigureRepertoire.actions(for: edge).map { action in
             let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: edge)
