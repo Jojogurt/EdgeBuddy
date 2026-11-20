@@ -183,6 +183,28 @@ enum FigureChain {
     }
 }
 
+/// What a tap on the figure does (`PeekingFigureView.tapped()`): it always
+/// goes back behind the card and comes out again, except where it holds
+/// still on purpose (a pin, Reduce Motion).
+enum FigureTap {
+    enum Response: Equatable {
+        /// Nothing happens: pinned, or Reduce Motion (no motion to play).
+        case ignore
+        /// Duck behind the card, come out elsewhere, play a new action.
+        case relocate
+        /// The stage waits (`isWaiting`): duck behind the card and come out
+        /// again on a top (the same card's when it fits), resting — no
+        /// action; the cycle carries on once the wait ends. A tap never
+        /// leaves the figure standing there unanswered.
+        case relocateResting
+    }
+
+    static func response(reduceMotion: Bool, isWaiting: Bool, isPinned: Bool) -> Response {
+        if reduceMotion || isPinned { return .ignore }
+        return isWaiting ? .relocateResting : .relocate
+    }
+}
+
 /// Joint angles of the figure rig, in degrees. A segment at angle `a` points
 /// along `(sin a, cos a)` in the 100×84 grid: 0 = down, 90 = right, 180 = up,
 /// -90 = left. Upper arms and thighs are absolute, elbows and knees bend

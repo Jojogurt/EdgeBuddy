@@ -160,7 +160,9 @@ struct PeekingFigureView: View {
             appear()
         }
         .onChange(of: isWaiting) { _, waiting in
-            if !waiting, isPending {
+            // Mid-play (a tap's duck and rest, the entrance): carry on once
+            // it ends (`playEnded`), not from the middle of the move.
+            if !waiting, isPending, startDate == nil {
                 isPending = false
                 resume()
             }
@@ -282,6 +284,12 @@ struct PeekingFigureView: View {
                 }
                 return
             }
+            // The wait ended while this play ran: carry on now.
+            if isPending, !isWaiting {
+                isPending = false
+                resume()
+                return
+            }
             // A one-shot play (looping was off when it began) just ended: if looping
             // became allowed meanwhile (the scene turned active mid-entrance), the
             // `idleMotionEnabled` change was skipped as busy — pick the loop up now.
@@ -290,7 +298,10 @@ struct PeekingFigureView: View {
             guard id == playID else { return }
             if isWaiting {
                 isPending = true
-            } else if canLoop {
+                return
+            }
+            isPending = false
+            if canLoop {
                 comeOut()
             } else {
                 // Idle motion went off mid-cycle: come back and stay standing.
@@ -496,11 +507,22 @@ struct PeekingFigureView: View {
     }
 
     /// Duck behind the card, come out elsewhere (maybe on another card or
-    /// edge), play a new action.
+    /// edge), play a new action. While the stage waits it still ducks and
+    /// comes out again, resting on a top, and carries on after the wait
+    /// (`FigureTap`).
     private func tapped() {
-        guard !reduceMotion, !isWaiting, !isPinned else { return }
-        onTap()
-        play(entrance: style.entrance, relocating: true)
+        switch FigureTap.response(reduceMotion: reduceMotion, isWaiting: isWaiting, isPinned: isPinned) {
+        case .ignore:
+            return
+        case .relocate:
+            onTap()
+            play(entrance: style.entrance, relocating: true)
+        case .relocateResting:
+            onTap()
+            play(entrance: style.entrance, action: FigureActionName.rest, relocating: true)
+            // The cycle picks up where it left off once the wait ends.
+            isPending = true
+        }
     }
 
     private func appear() {

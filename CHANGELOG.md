@@ -10,7 +10,12 @@ change in minor releases.
   crouches, springs up with both arms in a V, hops on the spot two to four times, then stands
   tall with the arms up, nods side to side and brings them down. It is part of the top's
   random repertoire and can be pinned as `FigurePose.celebrate` (held standing in the V).
-
+- Changed: a tap on the figure always answers. While the stage waits (`isWaiting`) a tap no
+  longer does nothing: the figure goes back behind the card and comes out again on a top (the
+  same card's when it fits), resting, and carries on once the wait ends. A pinned figure and
+  Reduce Motion still ignore taps.
+- Fixed: when a wait ends while the figure is still coming out (or still moving after a tap),
+  it carries on once that move ends instead of jumping to the next action mid-move.
 - Changed: the human figure no longer has a rest pose at a side. The pose leaning out from
   behind the card's edge is gone from everything it can show. At a side it only does the flag
   and the climb, always coming out hands first straight into the action and going back the

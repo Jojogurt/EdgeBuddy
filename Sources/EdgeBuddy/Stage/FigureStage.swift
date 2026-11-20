@@ -77,7 +77,8 @@ extension View {
     ///   - isWaiting: true while something else holds the stage (say a
     ///     celebration); the figure stays where it is (or behind its card;
     ///     at a side it goes back behind it, and it comes out on a top) and
-    ///     carries on once it ends.
+    ///     carries on once it ends. A tap meanwhile still sends it behind
+    ///     the card and out again, resting on a top.
     ///   - loops: true = it never settles (only while idle motion is
     ///     allowed, see `figureMotionEnabled(_:)`); otherwise it comes out
     ///     once and stands.
