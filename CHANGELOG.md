@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
-## 0.6.0 - 2026-11-20
+## Unreleased
 
 - Added: per-anchor actions. `figureAnchor(_:edges:actions:)` takes the actions the figure may
   play on that anchor, as `FigureActionName`s (`.wave`, `.march`, `.celebrate`, `.flag`, ...;

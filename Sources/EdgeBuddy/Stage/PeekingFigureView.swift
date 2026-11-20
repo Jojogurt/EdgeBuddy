@@ -650,6 +650,8 @@ struct PeekingFigureView: View {
         } else if let override {
             played = override
         } else {
+            // No frame = the anchor is gone from the stage, and its list
+            // with it: the edge's random repertoire (without opt-in actions).
             let available = anchorID.flatMap(rect(for:)).map {
                 actions(at: edge, on: $0, anchor: anchorID, from: popsUp ? nil : current.spot)
             } ?? character.actions(at: edge, room: 0, atScreenEdge: false)

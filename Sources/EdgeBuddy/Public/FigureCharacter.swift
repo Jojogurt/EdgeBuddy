@@ -107,7 +107,9 @@ public struct FigureCharacterAction<Pose: FigureCharacterPose>: Sendable {
     public var playsAtScreenEdge: Bool
     /// true = played only on anchors that list it
     /// (`figureAnchor(_:edges:actions:)`), never drawn at random elsewhere
-    /// (``HumanFigure``'s celebration is). false by default.
+    /// (``HumanFigure``'s celebration is). false by default. Opt-in goes by
+    /// name: an action of this name marked opt-in at one edge is opt-in at
+    /// every edge the character plays it.
     public var isOptIn: Bool
 
     /// The room along the edge it needs: `travel` times the fewest beats.
