@@ -4,6 +4,80 @@ Persistent record of design discussions, decisions, and phase status. New entrie
 
 ---
 
+## Android port (2026-11-20)
+
+Context: EdgeBuddy is iOS/macOS only (SwiftUI, 0.7.0). Question: can it have an Android
+equivalent and how. Answer: yes, as a native Kotlin + Jetpack Compose library in the same repo.
+
+Findings:
+- The rig is platform-free: `FigureRig.swift`, `FigureProps.swift`, `FigureStageRules.swift`
+  (~2.3k lines) import only CoreGraphics/Foundation: poses, keyframes, easing, limb IK,
+  action/edge picking. Ports 1:1.
+- The SwiftUI layer (~3k lines: stage, anchors, canvas, public API) is redesigned in Compose;
+  every API used has a counterpart (table below). "Behind the card" is a per-anchor rect clip
+  (`FigureRegionClip`) → `clipRect`.
+
+| iOS | Compose |
+|---|---|
+| `Canvas` / `GraphicsContext` | `Canvas` / `DrawScope` |
+| `TimelineView(.animation)` | `withFrameNanos` loop in `LaunchedEffect` |
+| `anchorPreference` + `overlayPreferenceValue` | `Modifier.figureAnchor()` via `onGloballyPositioned` + stage state in a `CompositionLocal` (unregister in `DisposableEffect`, lazy lists) |
+| `onScrollPhaseChange` | `NestedScrollConnection` on the stage (any scrollable, incl. `LazyColumn`) |
+| `accessibilityReduceMotion`, Low Power, `scenePhase` | `ANIMATOR_DURATION_SCALE == 0`, `PowerManager.isPowerSaveMode`, Lifecycle `RESUMED` |
+| `sensoryFeedback`, `layoutDirection`, `dynamicTypeSize` | `LocalHapticFeedback`, `LocalLayoutDirection`, `fontScale` |
+| `@Environment(\.figureColor)` etc. | `CompositionLocal` / style parameter |
+| `OSSignposter`, Combine, `RandomNumberGenerator` | `androidx.tracing`, coroutines/Flow, seeded `Random` |
+
+Decisions:
+- Native Kotlin/Compose port, not KMP (would turn the Swift package into a binary XCFramework,
+  lose Swift 6 strictness and SPI, and share only the math), not the Swift SDK for Android
+  (per-frame JNI bridge + Swift runtime in the AAR for a decorative widget), not Compose
+  Multiplatform (would replace the native SwiftUI version).
+- Monorepo: `android/` with a library module `edgebuddy` and a `sample` app; version catalog
+  aligned with Nextleg-Android (AGP 9.5, Kotlin 2.4, Compose BOM 2026.09). Compose only; Views
+  later via `ComposeView` if ever needed.
+- Parity by golden fixtures: a Swift test dumps `FigureTimeline.joints(at:)` samples for every
+  action × edge × entrance (+ picker results) to JSON in a shared `fixtures/` folder; Kotlin
+  JVM tests compare with tolerance ~1e-6. Both sides use the same seeded PRNG (SplitMix64) so
+  random picks are comparable too. A new iOS action fails the Android parity test until ported.
+- The `rig` package has no Android imports → fast plain JVM unit tests; the 179 Swift Testing
+  tests are ported to JUnit.
+- Public API in Compose style: `Modifier.figureAnchor("hero", edges = FigureEdges.All)`,
+  `Modifier.figureStage(isWaiting = …)`, `Modifier.peekingFigure()`, `RunningFigure()`,
+  custom characters (`FigureCharacter` / `CustomRig` drawing into `DrawScope`).
+- Distribution: Maven Central (namespace `io.github.jojogurt`, vanniktech maven-publish; the
+  account and GPG key are set up by Karol), JitPack as a quick start. Android versions track
+  the iOS version they match feature-wise.
+- CI: an Ubuntu job `./gradlew test` (+ sample build), path-filtered to `android/` and `fixtures/`.
+
+### Phase 6 — Android port (Kotlin + Jetpack Compose)
+Scope, in order (one phase, these are its steps):
+1. Swift side, tests only (no API change): SplitMix64 test generator, fixture export test → `fixtures/*.json`.
+2. Gradle scaffold in `android/`: library + sample app, version catalog, CI job.
+3. Rig port (`FigureJoints`, `FigureTimeline`, IK, props, variation/chain/tap rules, stage rules, anchor picker) + JVM unit tests + parity tests against the fixtures.
+4. Drawing: human skeleton → `DrawScope`, `RunningFigure` loader (first visible result in the sample).
+5. `Modifier.peekingFigure()` on a single card (top edge, tap, reduce motion, power save, lifecycle).
+6. Full stage: anchors (incl. `LazyColumn` add/remove), scroll via nested scroll (incl. nested/horizontal pagers), side routes, chained actions, tap → next card, haptics, `isWaiting`/`loops`/`isEnabled`, pins, RTL, `figureHeight`/color/opacity, per-anchor viewport clip.
+7. Custom characters API + demo `Ghost` equivalent; README "Android" section, KDoc.
+8. Publishing setup (Maven Central/JitPack), sample app GIF.
+
+Definition of Done: parity tests green against the fixtures for every action/edge/entrance; JVM
++ sample build green in CI; the sample app shows all four iOS demo tabs (Playground, Pinning,
+Static, Single card) on an emulator, checked visually in light/dark and RTL; no jank in a
+30-card `LazyColumn` scroll (Macrobenchmark or frame metrics), idle CPU ≈ 0 with `loops = false`;
+README documents installation and the API; Swift tests still green.
+
+Risks: anchors in lazy lists leaving composition mid-play; nested scrolls (pager in a vertical
+list) driving the scroll state; float differences in `acos`/`sin` between platforms (tolerance);
+the stage's overlay drawing over app bars (clip to the scroll container's bounds).
+- [x] Discussed
+- [x] Researched
+- [x] Planned
+- [ ] Executed
+- [ ] Committed
+
+---
+
 ## Audit 0.2.0 → roadmap 0.3.0 (2026-11-07)
 
 Context: audit of the 0.2.0 public repo (code, API, a11y, tests/CI, README, demo) plus a
