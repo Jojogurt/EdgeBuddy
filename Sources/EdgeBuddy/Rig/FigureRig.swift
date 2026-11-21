@@ -19,8 +19,14 @@ enum FigureAction: CaseIterable, Equatable, Sendable {
     case wormWalk
     /// Cartwheels into a handstand on the card's edge, wobbles, comes back.
     case handstand
-    /// Turns sideways and runs along the card's edge to another spot — the
-    /// loader's run cycle (`FigureJoints.run(phase:)`), the same rig in profile.
+    /// Turns sideways and runs along the card's edge, toward the wider side
+    /// on the top, as far as its steps carry it: the feet plant on the edge
+    /// and slide back at a steady pace with a flight phase between steps
+    /// (`FigureJoints.edgeRun(phase:)`, the same rig in profile), and the
+    /// figure moves `FigureJoints.edgeRunStride` grid units per cycle
+    /// (`FigureTimeline.walkDistance`). As many cycles as fit, up to the
+    /// action's repeats; the loader's own run in place is another stride
+    /// (`FigureJoints.run(phase:)`).
     case run
     /// A nap on the card's edge: a big yawn, kneels and lies down on its
     /// side along the edge, the head on one hand, and sleeps, breathing
@@ -292,6 +298,67 @@ struct FigureJoints: Equatable, Sendable {
 
     /// Length of one run cycle (two steps), seconds at tempo 1.
     static let runCycle = 0.66
+
+    /// The edge run's half stride, grid units: the planted foot goes from
+    /// `+edgeRunHalfStride` to `-edgeRunHalfStride` relative to the hip.
+    static let edgeRunHalfStride = 16.0
+    /// The share of a cycle each foot stays planted (under half, so there
+    /// is a flight phase between the steps).
+    static let edgeRunStance = 0.36
+    /// Grid units the figure travels per cycle: the planted foot's way back
+    /// (`2 * half stride`) per stance share, so the ground speed is constant
+    /// and equals the planted foot's.
+    static let edgeRunStride = 2 * edgeRunHalfStride / edgeRunStance
+
+    /// The run along the card's edge, seen from the side facing right: feet
+    /// that plant on the edge and slide back at a steady pace (the figure
+    /// moves `edgeRunStride` grid units per cycle), a flight phase between
+    /// steps, the swing foot kicking up behind first. Unlike the loader's
+    /// run in place (`run(phase:)`), whose feet slide on the ground. `phase`
+    /// in cycles (one cycle = `runCycle` seconds, two steps); `y` is set
+    /// so the planted foot stands on `FigureEdgePoses.groundY`.
+    static func edgeRun(phase: Double) -> FigureJoints {
+        let half = edgeRunHalfStride, beta = edgeRunStance
+        let baseHeight = 29.6, bob = 1.2, liftHeight = 17.0, kick = 0.32, fly = 2.2
+        func wrap(_ x: Double) -> Double { x - x.rounded(.down) }
+        func smooth(_ x: Double) -> Double { x * x * (3 - 2 * x) }
+        /// Foot x relative to the hip, its lift above the edge, and how far
+        /// through the stance (nil in the swing).
+        func foot(_ p: Double) -> (x: Double, lift: Double, stance: Double?) {
+            let p = wrap(p)
+            if p < beta {
+                let u = p / beta
+                return (half - 2 * half * u, 0, u)
+            }
+            let w = (p - beta) / (1 - beta)
+            let along = w < kick ? 0.12 * (w / kick) : 0.12 + 0.88 * smooth((w - kick) / (1 - kick))
+            let rise = w < kick ? sin(.pi / 2 * w / kick) : cos(.pi / 2 * (w - kick) / (1 - kick))
+            return (-half + 2 * half * along, liftHeight * pow(max(rise, 0), 1.2), nil)
+        }
+        let near = foot(phase), far = foot(phase + 0.5)
+        let height: Double
+        if let u = near.stance ?? far.stance {
+            height = baseHeight - bob * sin(.pi * u)
+        } else {
+            let q = wrap(phase).truncatingRemainder(dividingBy: 0.5)
+            height = baseHeight + fly * sin(.pi * (q - beta) / (0.5 - beta))
+        }
+        /// Two-bone IK to a foot at (`x`, `lift` above the edge); the knee bends forward.
+        func leg(_ foot: (x: Double, lift: Double, stance: Double?)) -> (leg: Double, knee: Double) {
+            let fy = height - foot.lift
+            let reach = min(hypot(foot.x, fy), 33.9)
+            let toward = atan2(foot.x, fy) * 180 / .pi
+            let bend = acos(reach / 34) * 180 / .pi
+            return (toward + bend, -2 * bend)
+        }
+        let r = leg(near), l = leg(far)
+        let swing = cos(2 * .pi * phase)
+        return FigureJoints(
+            armL: 46 * swing, elbowL: 88, armR: -46 * swing, elbowR: 88,
+            legL: l.leg, kneeL: l.knee, legR: r.leg, kneeR: r.knee,
+            lean: 10, y: FigureEdgePoses.groundY - 70 - height, tilt: 0, profile: 1, facing: 1
+        )
+    }
 
     /// A copy with some joints changed.
     func with(_ change: (inout FigureJoints) -> Void) -> FigureJoints {
@@ -1052,7 +1119,7 @@ struct FigureTimeline: Equatable, Sendable {
     /// How far the figure travels, grid units, when its limbs set the
     /// distance (keyframe `travel`: the worm walk, the climb) — the stage
     /// moves it exactly this far so held hands and feet don't skate; nil =
-    /// the stage picks the target (the run).
+    /// the stage picks the target (no action does now).
     let walkDistance: Double?
 
     /// Set when the sequence ends hidden behind the card (`FigureVariation.exit`):
@@ -1082,15 +1149,6 @@ struct FigureTimeline: Equatable, Sendable {
     /// sits for the peeking figure (`FigureSkeleton.edgeY`): poses "behind
     /// the card" are this much lower, so the standing feet end on the edge.
     static let behind = Double(FigureSkeleton.edgeY - FigureSkeleton.gridSize.height)
-
-    /// Lowers the run (its bent strides reach less far down than standing
-    /// legs, canvas `S_loadery`) so the lowest foot touches the edge like the
-    /// standing feet instead of floating above it.
-    static let runDrop = 3.0
-
-    private static func run(phase: Double) -> FigureJoints {
-        FigureJoints.run(phase: phase).with { $0.y += runDrop }
-    }
 
     /// Ducking behind the card before moving to a new spot, seconds.
     static let duckDuration = 0.24
@@ -1371,13 +1429,18 @@ struct FigureTimeline: Equatable, Sendable {
             at(0.36, poses.handstandReach, limbs: poses.handstandLunge)
             at(0.36, rest)
         case .run:
-            // Turn sideways into the first stride, run `runCycles` cycles
+            // Turn sideways into the first stride, run `repeats` cycles
             // (sampled densely, linear in between), turn back to the front.
-            at(0.22, Self.run(phase: 0))
+            // Every sample carries its share of the stride, so the figure
+            // moves exactly as far as its planted feet push it back.
+            at(0.22, FigureJoints.edgeRun(phase: 0))
             let runStart = time
             let samples = Self.runSamplesPerCycle
             for i in 1...(repeats * samples) {
-                at(FigureJoints.runCycle / Double(samples), Self.run(phase: Double(i) / Double(samples)), .linear)
+                at(
+                    FigureJoints.runCycle / Double(samples), FigureJoints.edgeRun(phase: Double(i) / Double(samples)),
+                    .linear, travel: FigureJoints.edgeRunStride / Double(samples)
+                )
             }
             walk = runStart...time
             at(0.3, rest)
@@ -1556,6 +1619,7 @@ struct FigureTimeline: Equatable, Sendable {
         switch action {
         case .climb: 2 * FigureEdgePoses.climbReach * Double(repeats)
         case .wormWalk: FigureEdgePoses.wormStride * Double(repeats)
+        case .run: FigureJoints.edgeRunStride * Double(repeats)
         default: nil
         }
     }
@@ -1563,7 +1627,10 @@ struct FigureTimeline: Equatable, Sendable {
     /// The shortest travel `action` needs (`travel` at the fewest repeats
     /// `FigureVariation.repeatRange` allows); nil when it stays put.
     static func minimumTravel(_ action: FigureAction) -> Double? {
-        travel(action, repeats: FigureVariation.repeatRange(action).lowerBound)
+        // The run is cut to the cycles that fit (at least one), so it only
+        // needs room for one.
+        if action == .run { return travel(.run, repeats: 1) }
+        return travel(action, repeats: FigureVariation.repeatRange(action).lowerBound)
     }
 
     /// The steps from `hiddenPose(entrance, edge:)` up to the edge's rest.
@@ -1633,8 +1700,12 @@ struct FigureTimeline: Equatable, Sendable {
 
     /// Run cycles played by `run` (≈ 2.6 s at tempo 1).
     static let runCycles = 4
-    /// Keyframes per run cycle — enough that linear blends read as a curve.
-    static let runSamplesPerCycle = 12
+    /// Keyframes per run cycle — enough that linear blends read as a curve
+    /// and the planted foot doesn't drift between samples. 50, so that the
+    /// end of each stance (36 % of a cycle, 18 samples) and the half cycle
+    /// (25) fall on a keyframe: a blend across the lift-off would raise the
+    /// foot before it leaves.
+    static let runSamplesPerCycle = 50
 
     /// Fully behind the card, ready for `entrance`.
     static func hiddenPose(_ entrance: FigureEntrance, edge: FigureEdge = .top) -> FigureJoints {

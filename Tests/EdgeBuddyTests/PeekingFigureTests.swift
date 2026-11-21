@@ -259,8 +259,9 @@ struct PeekingFigureTests {
         #expect(FigureTimeline(action: .march, entrance: .spring, reduceMotion: false).walkWindow == nil)
         let reduced = FigureTimeline(action: .wormWalk, entrance: .spring, reduceMotion: true)
         #expect(reduced.walkWindow == nil && reduced.walkDistance == nil)
-        // The run glides to a target the stage picks.
-        #expect(FigureTimeline(action: .run, entrance: nil, reduceMotion: false).walkDistance == nil)
+        // The run goes as far as its steps carry it: a stride per cycle.
+        let run = FigureTimeline(action: .run, entrance: nil, reduceMotion: false)
+        #expect(abs(try #require(run.walkDistance) - 4 * FigureJoints.edgeRunStride) < 1e-9)
     }
 
     // MARK: - Looping

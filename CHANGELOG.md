@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## 0.8.1 - 2026-11-21
+
+- Fixed: the run along an edge now plants its feet. It uses a running stride of its own, with a
+  flight phase between the steps, and moves exactly as far as its steps carry it, at a steady
+  pace, instead of gliding to a random spot with the feet sliding on the edge. It is offered
+  wherever one cycle fits and runs as many cycles as the room allows. The loader keeps its own
+  run in place.
+
 ## 0.8.0 - 2026-11-21
 
 - Added: two top-edge actions in the random repertoire. `.nap`: a big yawn, the figure kneels

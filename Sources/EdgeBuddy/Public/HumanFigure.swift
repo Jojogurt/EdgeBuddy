@@ -114,6 +114,10 @@ public struct HumanFigure: FigureCharacter {
     /// spray and the nap's Z glyphs are drawn by the stage (they are effects
     /// beside the figure, not joints); a pose drawn here shows the bottle
     /// without the spray and the sleeper without the Zs.
+    /// The travelling actions (the run, the worm walk, the climb) report how far
+    /// their limbs carry the figure (`FigureCharacterAction.travel`): the run
+    /// moves exactly as far as its planted feet push it back, so a host must
+    /// move it by that, not glide it to a spot of its own.
     public func actions(at edge: FigureEdge) -> [FigureCharacterAction<Pose>] {
         FigureRepertoire.actions(for: edge).map { action in
             let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: edge)

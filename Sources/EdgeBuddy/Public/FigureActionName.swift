@@ -48,7 +48,8 @@ public struct FigureActionName: RawRepresentable, Hashable, Sendable, Expressibl
     public static let wormWalk = Self(FigureAction.wormWalk)
     /// Top: cartwheels into a handstand.
     public static let handstand = Self(FigureAction.handstand)
-    /// Top: runs along the edge to another spot.
+    /// Top: runs along the edge toward the wider side, as far as its steps
+    /// carry it (whole cycles that fit).
     public static let run = Self(FigureAction.run)
     /// Top: yawns, lies down on its side along the edge and naps, Z glyphs
     /// rising, then startles awake and gets up. Long, so drawn less often.
