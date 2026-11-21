@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## 0.8.2 - 2026-11-21
+
+- Fixed: 0.8.0 and 0.8.1 did not compile with Xcode 16 (Swift 6.1): a local constant in the
+  stage shadowed a variable that a closure above it already captured.
+
 ## 0.8.1 - 2026-11-21
 
 - Fixed: the run along an edge now plants its feet. It uses a running stride of its own, with a
