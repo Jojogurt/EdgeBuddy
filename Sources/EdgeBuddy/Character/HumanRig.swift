@@ -27,8 +27,9 @@ enum HumanRig {
                         joints(timeline, at: $0, edge: edge, heading: heading)
                     }
                 } ?? []
+                let zs = timeline.snoozeWindow.map { SnoozeZs.glyphs(at: time, window: $0, pose: pose) } ?? []
                 return FigureFrame(isOut: isOut(pose, at: edge)) { context, color in
-                    HumanDrawing.draw(pose, figure: figure, in: &context, color: color, spray: drops)
+                    HumanDrawing.draw(pose, figure: figure, in: &context, color: color, spray: drops, zs: zs)
                 }
             }
         )
@@ -38,7 +39,8 @@ enum HumanRig {
         FigureActionInfo(
             travelPerBeat: FigureTimeline.travel(action, repeats: 1),
             repeatRange: FigureVariation.repeatRange(action),
-            defaultRepeats: FigureTimeline.canvasRepeats(action)
+            defaultRepeats: FigureTimeline.canvasRepeats(action),
+            weight: FigureRepertoire.weight(action)
         )
     }
 
@@ -84,11 +86,12 @@ enum HumanRig {
 }
 
 /// Draws one frame of `HumanFigure` in the rig's grid: far limbs (faded in
-/// profile), torso, head, the bottle, near limbs, then the spray.
+/// profile), torso, head, the bottle, near limbs, then the spray and the
+/// nap's Z glyphs.
 enum HumanDrawing {
     static func draw(
         _ joints: FigureJoints, figure: HumanFigure, in context: inout GraphicsContext, color: Color,
-        spray: [ChampagneSpray.Drop] = []
+        spray: [ChampagneSpray.Drop] = [], zs: [SnoozeZs.Glyph] = []
     ) {
         let skeleton = FigureSkeleton(joints)
         func shading(_ part: Color?) -> GraphicsContext.Shading { .color(part ?? color) }
@@ -152,6 +155,10 @@ enum HumanDrawing {
                     with: .color(color.opacity(0.9 * drop.opacity))
                 )
             }
+        }
+        let stroke = StrokeStyle(lineWidth: SnoozeZs.lineWidth, lineCap: .round, lineJoin: .round)
+        for glyph in zs {
+            context.stroke(Path { $0.addLines(glyph.points) }, with: .color(color.opacity(glyph.opacity)), style: stroke)
         }
     }
 

@@ -4,6 +4,54 @@ Persistent record of design discussions, decisions, and phase status. New entrie
 
 ---
 
+## New actions: nap, slip (2026-11-21)
+
+Context: Karol asked for richer, more interesting animations. A first prototype added
+generic polish (springs/overlap, breathing, eyes, round hands, squash) and looked worse than
+what we have: the figure's strength is crisp pose-to-pose, pictogram-like motion. Direction
+changed to new content in the unchanged style. Karol picked three ideas; sketched in a JS
+copy of the rig (same joints, bone lengths, IK, easings):
+`/Volumes/Lexar SSD/DevCache/EdgeBuddy/sketches/new-actions.html` + `core.js` (serve the
+folder over `python3 -m http.server`; poses and timings there are the reference).
+
+Decisions:
+- Nap and slip go in; sitting on the edge with dangling legs is dropped. Side view at a
+  corner reads as the wheelchair pictogram, and real card corners (16-20 pt) are rounder
+  than the 9 pt thigh, so there is nowhere to sit; a front-view sit would put the shins over
+  the card face (breaks "nothing plays over the card") and needs foreshortening the rig lacks.
+- Both are top-edge actions in the random repertoire, same visual language, no new shapes on
+  the figure. Nap's only addition is a "Z" glyph effect beside the head.
+- They land before the Android port so its parity fixtures include them.
+
+### Phase 6 — Nap and slip actions
+Scope:
+1. `FigureAction.nap` (top edge, ~12 s): yawn with arms up and a head roll, kneels, lies down
+   on its side along the edge (profile, `lean` 90, arms via limb IK onto the edge), breathes
+   slowly (3 cycles of tiny `lean`/`tilt` changes), Z glyphs rise every ~0.9 s while asleep and
+   fade out on waking, startles awake (quick head jerk), kneels, stands, shakes the head.
+   Z glyphs as a timed effect like `ChampagneSpray` (figure color, mirrored in RTL, part of
+   `joints(at:)`-time so pins and fixtures stay pure functions of time).
+2. `FigureAction.slip` (top edge): a step in profile, the foot shoots forward (banana-peel),
+   the body tips back and drops behind the card, catches the edge with both hands (sag and
+   rebound), turns to the front while hidden, a look around while pulled up, then climbs back
+   up reusing the climb's hang/steps (`climbHang`/`climbSteps`) and wipes the brow.
+3. Repertoire: repeat ranges, weights (nap rarer, it is long), room checks (nap lies along the
+   edge: needs its length of room), scroll interrupting mid-nap/mid-hang ends cleanly, pins
+   (`holdTime` for a still frame of each), `HumanFigure.actions(at:)`, reduce motion / Low Power.
+4. Tests (timeline continuity, still windows: idle CPU ≈ 0 with `loops: false` after both),
+   demo Playground picker entries, README/DocC action list, CHANGELOG.
+
+Definition of Done: both actions play from the random repertoire and from pins on the demo,
+checked visually in light/dark, LTR/RTL, on a card with 16-20 pt corners; timings match the
+sketch; no frame where a limb pokes over the card face; tests green; version bump (minor).
+- [x] Discussed
+- [x] Researched
+- [x] Planned
+- [x] Executed
+- [x] Committed
+
+---
+
 ## Android port (2026-11-20)
 
 Context: EdgeBuddy is iOS/macOS only (SwiftUI, 0.7.0). Question: can it have an Android
@@ -50,9 +98,9 @@ Decisions:
   the iOS version they match feature-wise.
 - CI: an Ubuntu job `./gradlew test` (+ sample build), path-filtered to `android/` and `fixtures/`.
 
-### Phase 6 — Android port (Kotlin + Jetpack Compose)
+### Phase 7 — Android port (Kotlin + Jetpack Compose)
 Scope, in order (one phase, these are its steps):
-1. Swift side, tests only (no API change): SplitMix64 test generator, fixture export test → `fixtures/*.json`.
+1. Swift side, tests only (no API change): SplitMix64 test generator, fixture export test → `fixtures/*.json` (after Phase 6, so nap and slip are in them).
 2. Gradle scaffold in `android/`: library + sample app, version catalog, CI job.
 3. Rig port (`FigureJoints`, `FigureTimeline`, IK, props, variation/chain/tap rules, stage rules, anchor picker) + JVM unit tests + parity tests against the fixtures.
 4. Drawing: human skeleton → `DrawScope`, `RunningFigure` loader (first visible result in the sample).

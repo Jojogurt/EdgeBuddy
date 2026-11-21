@@ -16,6 +16,8 @@ struct PeekingFigureTests {
         (.wormWalk, 4.48),
         (.handstand, 4.16),
         (.run, 3.16),
+        (.nap, 11.42),
+        (.slip, 4.83),
         (.celebrate, 2.78),
         (.champagne, 5.55),
         (.flex, 5.82),
@@ -29,7 +31,7 @@ struct PeekingFigureTests {
 
     @Test("Every action starts and ends at rest", arguments: [
         FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate,
-        .champagne, .flex,
+        .champagne, .flex, .nap, .slip,
     ])
     func endsAtRest(action: FigureAction) {
         let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false)
@@ -313,7 +315,7 @@ struct PeekingFigureTests {
     @Test("Repeat count changes the action's beats", arguments: [
         (FigureAction.wave, 0.4), (.jumpingJacks, 0.6), (.march, 0.8), (.wormWalk, 0.76), (.handstand, 0.64),
         (.run, 0.66), (.rest, 0.48), (.sideStretch, 2.9), (.celebrate, 0.38),
-        (.champagne, 3.86), (.flex, 3.52),
+        (.champagne, 3.86), (.flex, 3.52), (.nap, 2.4), (.slip, 0.45),
     ])
     func repeatCount(action: FigureAction, beat: Double) {
         func length(_ repeats: Int) -> Double {
@@ -330,7 +332,7 @@ struct PeekingFigureTests {
         var generator = SystemRandomNumberGenerator()
         for action in [
             FigureAction.rest, .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate,
-            .champagne, .flex,
+            .champagne, .flex, .nap, .slip,
         ] {
             for _ in 0..<50 {
                 let v = FigureVariation.random(for: action, exit: .spring, using: &generator)

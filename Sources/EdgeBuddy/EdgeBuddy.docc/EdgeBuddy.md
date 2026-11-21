@@ -6,8 +6,9 @@ A tiny stick figure that lives on the edges of your SwiftUI cards.
 
 EdgeBuddy adds one small, single-colour figure to a screen. It comes out
 from behind a card you mark, plays a short random action — waves, jumping
-jacks, a stretch, marching, a caterpillar worm walk, a handstand or a run on
-the top edge (plus the winner's celebrations on anchors that ask for them:
+jacks, a stretch, marching, a caterpillar worm walk, a handstand, a run, a nap
+on its side with Z glyphs rising, or a slip off the edge that ends hanging by
+the hands and climbing back up on the top edge (plus the winner's celebrations on anchors that ask for them:
 hops with both arms up in a V, a shaken bottle of champagne going off to
 each side, a bodybuilder's poses); hangs,
 swings and pulls itself up under the bottom edge;

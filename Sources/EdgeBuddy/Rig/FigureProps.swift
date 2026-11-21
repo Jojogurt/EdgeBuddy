@@ -245,3 +245,64 @@ enum FigureBiceps {
         return (center, radius)
     }
 }
+
+/// The nap's Z glyphs (`FigureTimeline.snoozeWindow`): while it sleeps a
+/// "Z" leaves beside the head every `interval`, grows, drifts up and away
+/// from the face and fades in and out over `life`; on waking the ones in
+/// the air fade out within `fadeOut`. A pure function of the time and the
+/// pose shown, like the joints, so a pinned or sampled frame is exact.
+enum SnoozeZs {
+    /// One glyph, as drawn: a stroked "Z" in the figure's colour.
+    struct Glyph: Equatable, Sendable {
+        var center: CGPoint
+        /// Width and height of the letter, grid units.
+        var size: Double
+        var opacity: Double
+
+        /// The stroke: the top bar, the diagonal, the bottom bar.
+        var points: [CGPoint] {
+            let h = size / 2
+            return [
+                CGPoint(x: center.x - h, y: center.y - h), CGPoint(x: center.x + h, y: center.y - h),
+                CGPoint(x: center.x - h, y: center.y + h), CGPoint(x: center.x + h, y: center.y + h),
+            ]
+        }
+    }
+
+    /// A new glyph every this many seconds while asleep.
+    static let interval = 0.9
+    /// How long one rises, seconds.
+    static let life = 2.4
+    /// How fast the ones in the air fade on waking, seconds.
+    static let fadeOut = 0.2
+    /// The letter's line width, grid units.
+    static let lineWidth = 1.6
+
+    /// The glyphs at `time` of a nap asleep during `window`, around the
+    /// head of `pose` (the pose at `time`). Facing left (`facing` < 0) they
+    /// drift to the left; the letter itself always reads as a Z.
+    static func glyphs(at time: Double, window: ClosedRange<Double>, pose: FigureJoints) -> [Glyph] {
+        guard time > window.lowerBound, time < window.upperBound + fadeOut else { return [] }
+        let head = FigureSkeleton(pose).head
+        let side: Double = pose.facing < 0 ? -1 : 1
+        let waking = time > window.upperBound ? max(0, 1 - (time - window.upperBound) / fadeOut) : 1
+        var glyphs: [Glyph] = []
+        var birth = window.lowerBound
+        var index = 0.0
+        while birth < window.upperBound {
+            let u = (time - birth) / life
+            if u >= 0, u <= 1 {
+                let opacity = sin(.pi * u) * waking
+                if opacity > 0.01 {
+                    glyphs.append(Glyph(
+                        center: CGPoint(x: head.x + side * (4 + 10 * u), y: head.y - 11 - 17 * u),
+                        size: 3 + 3.2 * u, opacity: opacity
+                    ))
+                }
+            }
+            index += 1
+            birth = window.lowerBound + index * interval
+        }
+        return glyphs
+    }
+}

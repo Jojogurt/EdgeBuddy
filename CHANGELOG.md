@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 the public API may still
 change in minor releases.
 
+## 0.8.0 - 2026-11-21
+
+- Added: two top-edge actions in the random repertoire. `.nap`: a big yawn, the figure kneels
+  and lies down on its side along the edge, the head on one hand, and sleeps, breathing slowly
+  while Z glyphs rise beside the head; it startles awake, kneels, stands up and shakes the head.
+  It is long (about 12 s), so it comes up about a third as often as the other actions. `.slip`:
+  a step, the foot shoots forward as on a banana peel, the figure tips back and drops behind
+  the card, catches the edge with both hands, pulls up for a look around, climbs back up and
+  wipes its brow. The body stays behind the card the whole time it hangs: only the hands and
+  then the head show over the edge. Pin them with `FigurePose.nap` (asleep, a Z beside the
+  head) and `FigurePose.slip` (pulled up, looking over the edge); list them on an anchor with
+  `.nap` and `.slip`.
+- Fixed: the animation clock no longer stops while the champagne's drops are still in the air
+  (it paused for a moment right after each burst).
+
 ## 0.7.0 - 2026-11-20
 
 - Added: two more opt-in celebrations on the top edge. `.champagne`: a bottle pops into the

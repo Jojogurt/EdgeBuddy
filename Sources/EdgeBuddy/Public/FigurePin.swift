@@ -20,6 +20,12 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     case march
     /// Top: balanced on its hands, legs up.
     case handstand
+    /// Top: asleep on its side along the edge, the head on one hand, a Z
+    /// rising beside it.
+    case nap
+    /// Top: slipped off the edge, pulled up on both hands behind the card,
+    /// the head over the edge, looking around.
+    case slip
     /// Top: standing tall with both arms up in a V, a winner on the podium.
     /// Pinnable anywhere; played freely only on anchors that list it
     /// (`figureAnchor(_:edges:actions:)`).
@@ -42,7 +48,7 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
     public var edges: FigureEdges {
         switch self {
         case .rest: [.top, .bottom]
-        case .wave, .jumpingJacks, .sideStretch, .march, .handstand, .celebrate, .champagne, .flex: .top
+        case .wave, .jumpingJacks, .sideStretch, .march, .handstand, .nap, .slip, .celebrate, .champagne, .flex: .top
         case .swing, .pullUp: .bottom
         case .flag: [.leading, .trailing]
         }
@@ -67,6 +73,8 @@ public enum FigurePose: String, CaseIterable, Hashable, Sendable {
         case .sideStretch: .sideStretch
         case .march: .march
         case .handstand: .handstand
+        case .nap: .nap
+        case .slip: .slip
         case .celebrate: .celebrate
         case .champagne: .champagne
         case .flex: .flex

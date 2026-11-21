@@ -14,8 +14,8 @@ public enum FigureHead: Sendable {
 }
 
 /// The built-in figure: a stick figure with a skeleton, two-bone IK and the
-/// whole repertoire — waves, jumping jacks, a worm walk, a handstand and
-/// three winner's celebrations (hops with the arms in a V, champagne going
+/// whole repertoire: waves, jumping jacks, a worm walk, a handstand, a nap,
+/// a slip off the edge and three winner's celebrations (hops with the arms in a V, champagne going
 /// off, a bodybuilder's poses; opt-in, see `figureAnchor(_:edges:actions:)`)
 /// on the top, swings and pull-ups under the bottom,
 /// flags and climbs at the sides — with the climb or spring entrance of `FigureStyle`.
@@ -111,8 +111,9 @@ public struct HumanFigure: FigureCharacter {
     /// own held pose back to it (the stage itself plays the rig, with its
     /// random repeat counts, routes and grips). The celebrations are opt-in
     /// (`isOptIn`): they play only on anchors that list them. The champagne
-    /// spray is drawn by the stage (it needs the drops' past); a pose drawn
-    /// here shows the bottle without it.
+    /// spray and the nap's Z glyphs are drawn by the stage (they are effects
+    /// beside the figure, not joints); a pose drawn here shows the bottle
+    /// without the spray and the sleeper without the Zs.
     public func actions(at edge: FigureEdge) -> [FigureCharacterAction<Pose>] {
         FigureRepertoire.actions(for: edge).map { action in
             let timeline = FigureTimeline(action: action, entrance: nil, reduceMotion: false, edge: edge)

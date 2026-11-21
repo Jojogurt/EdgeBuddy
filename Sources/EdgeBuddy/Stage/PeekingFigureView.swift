@@ -676,8 +676,11 @@ struct PeekingFigureView: View {
                 play(entrance: nil, action: FigureRest.name, leaving: true)
                 return
             }
+            // By weight: long actions (the human's nap) come up less often.
+            let edge = edge
             played = FigureRepertoire.next(
-                after: chainStep ? nil : lastAction, from: available, fallback: FigureRest.name, using: &generator
+                after: chainStep ? nil : lastAction, from: available, fallback: FigureRest.name,
+                weight: { character.info($0, at: edge).weight }, using: &generator
             )
         }
         if played == FigureRest.name, !leaving, !canStand(at: edge) {

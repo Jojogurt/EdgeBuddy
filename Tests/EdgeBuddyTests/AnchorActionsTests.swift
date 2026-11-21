@@ -82,7 +82,10 @@ struct AnchorActionsTests {
                 excluding: current, edge: currentEdge, allowed: .all, after: last, using: &generator
             ), let rect = rules.anchors.first(where: { $0.id == place.id })?.rect else { break }
             let available = rules.actions(at: place.edge, on: rect, anchor: place.id, from: nil)
-            let action = FigureRepertoire.next(after: last, from: available, fallback: FigureRest.name, using: &generator)
+            let action = FigureRepertoire.next(
+                after: last, from: available, fallback: FigureRest.name,
+                weight: { rules.character.info($0, at: place.edge).weight }, using: &generator
+            )
             played.append((place.id, place.edge, action))
             current = place.id
             currentEdge = place.edge
@@ -96,7 +99,7 @@ struct AnchorActionsTests {
     @Test("FigureActionName: one static per HumanFigure action, by name; string literals work")
     func names() {
         let statics: [FigureActionName] = [
-            .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate,
+            .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .nap, .slip, .celebrate,
             .champagne, .flex, .swing, .pullUp, .flag, .climb,
         ]
         #expect(statics.map(\.rawValue) == FigureAction.allCases.filter { $0 != .rest }.map(\.name))
@@ -122,10 +125,10 @@ struct AnchorActionsTests {
 
     // MARK: - What an anchor offers
 
-    @Test("Default anchors: the 0.4 top repertoire, never the celebration; other edges unchanged")
+    @Test("Default anchors: the top repertoire with the nap and the slip, never the celebrations; other edges unchanged")
     func defaultRepertoire() {
         #expect(human.actions(at: .top, room: 1000, atScreenEdge: false)
-            == ["wave", "jumpingJacks", "sideStretch", "march", "wormWalk", "handstand", "run"])
+            == ["wave", "jumpingJacks", "sideStretch", "march", "wormWalk", "handstand", "run", "nap", "slip"])
         #expect(human.actions(at: .bottom, room: 1000, atScreenEdge: false) == ["swing", "pullUp"])
         #expect(human.actions(at: .trailing, room: 1000, atScreenEdge: false) == ["flag", "climb"])
         #expect(human.actions(at: .trailing, room: 1000, atScreenEdge: true) == ["climb"])
@@ -176,7 +179,7 @@ struct AnchorActionsTests {
         // Still the whole default repertoire at every edge.
         #expect(Set(played.map(\.edge)) == Set(FigureEdge.allCases))
         #expect(Set(played.filter { $0.edge == .top }.map(\.action))
-            == ["wave", "jumpingJacks", "sideStretch", "march", "wormWalk", "handstand", "run"])
+            == ["wave", "jumpingJacks", "sideStretch", "march", "wormWalk", "handstand", "run", "nap", "slip"])
     }
 
     @Test("The podium only celebrates, and only the podium celebrates", arguments: [UInt64(1), 2, 3])

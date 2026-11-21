@@ -22,6 +22,18 @@ enum FigureAction: CaseIterable, Equatable, Sendable {
     /// Turns sideways and runs along the card's edge to another spot — the
     /// loader's run cycle (`FigureJoints.run(phase:)`), the same rig in profile.
     case run
+    /// A nap on the card's edge: a big yawn, kneels and lies down on its
+    /// side along the edge, the head on one hand, and sleeps, breathing
+    /// slowly while Z glyphs rise beside the head (`SnoozeZs`); startles
+    /// awake, kneels, stands up and shakes the head. Long, so drawn less
+    /// often than the others (`FigureRepertoire.weight`).
+    case nap
+    /// Slips on the card's edge as on a banana peel: a step, the foot
+    /// shoots forward, the body tips back and drops behind the card; the
+    /// hands catch the edge, it turns to the front while hidden, pulls up
+    /// for a look around, climbs back up like the climb's entrance and
+    /// wipes the brow.
+    case slip
     /// A winner on the podium: crouches, springs up with both arms in a V,
     /// hops on the spot, then stands tall with the arms up and nods side to
     /// side before they come down.
@@ -114,6 +126,8 @@ struct FigureVariation: Equatable, Sendable {
         case .pullUp: 1...3
         case .celebrate: 2...4
         case .champagne, .flex: 1...2
+        case .nap: 2...3
+        case .slip: 1...2
         }
     }
 
@@ -382,6 +396,19 @@ extension FigureJoints {
         }
     }
 
+    /// `placing(_:at:)` with the elbow or knee on whichever side lies nearer
+    /// to where this pose's own angles put it (the sketches' IK): a reach
+    /// that keeps the joint where it was instead of a fixed bend side.
+    func placingNearest(_ limb: FigureLimb, at target: CGPoint) -> FigureJoints {
+        let guide = FigureSkeleton(self).chain(limb)[1]
+        func gap(_ pose: FigureJoints) -> Double {
+            let joint = FigureSkeleton(pose).chain(limb)[1]
+            return hypot(Double(joint.x - guide.x), Double(joint.y - guide.y))
+        }
+        let positive = placing(limb, at: target, bend: 1), negative = placing(limb, at: target, bend: -1)
+        return gap(positive) <= gap(negative) ? positive : negative
+    }
+
     /// A copy with each given hand or foot placed on its point (`placing(_:at:)`).
     func placing(
         armL l: CGPoint? = nil, armR r: CGPoint? = nil, legL fl: CGPoint? = nil, legR fr: CGPoint? = nil
@@ -404,9 +431,15 @@ struct LimbPath: Equatable, Sendable {
     /// The side the elbow or knee bends to (the sign of its bend); nil = as
     /// the blended pose has it.
     var bend: Double?
+    /// The elbow or knee on whichever side is nearer to where the blended
+    /// angles put it (`FigureJoints.placingNearest`), `bend` ignored.
+    var nearest = false
 
     /// A grip or a planted foot: on the line, no lift.
     static let held = LimbPath()
+
+    /// On the line, the joint on its nearer side (`nearest`).
+    static let natural = LimbPath(nearest: true)
 
     /// Lifted by `dx`, `dy` half-way.
     static func lifted(_ dx: Double, _ dy: Double) -> LimbPath {
@@ -875,6 +908,75 @@ enum FigureEdgePoses {
     static let flexArmsDown = planted(rest.with {
         $0.armL = -24; $0.elbowL = -6; $0.armR = 24; $0.elbowR = 6; $0.legL = -10; $0.legR = 10
     })
+
+    // MARK: Top - the nap
+
+    /// A big yawn: both arms stretched up, feet a little apart, the head back.
+    static let napYawn = rest.with {
+        $0.armL = -160; $0.elbowL = -15; $0.armR = 160; $0.elbowR = 15; $0.legL = -7; $0.legR = 7; $0.tilt = 7
+    }
+    /// Where the sleeping hands rest: the near one under the head (a
+    /// pillow), the far one on the edge by the hip.
+    static let napPillow = CGPoint(x: 79, y: 102.5)
+    static let napHand = CGPoint(x: 40, y: 102)
+    /// Lying on its side along the edge in profile (facing right, like the
+    /// worm's kneel it gets up from), knees a little bent, the head on the
+    /// near hand; `lean` and `tilt` breathe.
+    static func napLying(lean: Double, tilt: Double) -> FigureJoints {
+        rest.with {
+            $0.armL = 45; $0.elbowL = 10; $0.armR = 220; $0.elbowR = -100
+            $0.legL = -95; $0.kneeL = 9; $0.legR = -100; $0.kneeR = 15
+            $0.lean = lean; $0.tilt = tilt; $0.profile = 1; $0.x = -6; $0.y = 32
+        }.placingNearest(.armL, at: napHand).placingNearest(.armR, at: napPillow)
+    }
+    /// Asleep (the nap's hold frame).
+    static let napAsleep = napLying(lean: 90, tilt: -14)
+    /// Breathing in and out: the chest rises and falls, the head with it.
+    static let napInhale = napLying(lean: 87.5, tilt: -15)
+    static let napExhale = napLying(lean: 90.5, tilt: -13)
+    /// Startled awake: the head jerks up off the hand.
+    static let napStartle = napLying(lean: 84, tilt: -32)
+    /// Kneeling to lying (and back): the hands go down onto (or come off)
+    /// their spots on the edge in a straight line (the legs swing out by
+    /// their angles, the feet brushing the edge).
+    static let napHands = LimbPaths(armL: .natural, armR: .natural)
+
+    // MARK: Top - the slip (its hang and climb back are the climb entrance's)
+
+    /// A step in profile, facing right, the back foot pushing off.
+    static let slipStep = rest.with {
+        $0.armL = 30; $0.elbowL = 40; $0.armR = -28; $0.elbowR = 40
+        $0.legL = -20; $0.kneeL = -18; $0.legR = 24; $0.kneeR = -12; $0.lean = 6; $0.profile = 1
+    }
+    /// The front foot shoots forward, the arms fly up, the body tips back.
+    static let slipKick = rest.with {
+        $0.armL = 118; $0.elbowL = 35; $0.armR = 150; $0.elbowR = 20
+        $0.legL = 28; $0.kneeL = -32; $0.legR = 78; $0.kneeR = -6
+        $0.lean = -24; $0.y = -3; $0.tilt = -14; $0.profile = 1
+    }
+    /// Falling back, both feet off the edge, the arms reaching back for it.
+    static let slipTip = rest.with {
+        $0.armL = 150; $0.elbowL = 20; $0.armR = 175; $0.elbowR = 10
+        $0.legL = 70; $0.kneeL = -22; $0.legR = 96; $0.kneeR = 0
+        $0.lean = -55; $0.y = 7; $0.tilt = -8; $0.profile = 1
+    }
+    /// Caught: hanging behind the card by both hands on the edge, still in
+    /// profile (the climb entrance's hang).
+    static let slipCaught = FigureTimeline.climbHang.with { $0.profile = 1 }
+    /// The catch sags on the arms.
+    static let slipSag = FigureTimeline.climbHang.with { $0.y = 65 + FigureTimeline.behind; $0.tilt = 4; $0.profile = 1 }
+    /// Hanging from the front, dipping before it pulls up.
+    static let slipDip = FigureTimeline.climbHang.with { $0.y = 65 + FigureTimeline.behind }
+    /// Pulled up, the head over the edge, looking around (the slip's hold
+    /// frame: to the left).
+    static let slipLookLeft = FigureTimeline.climbPulled.with { $0.tilt = -9 }
+    static let slipLookRight = FigureTimeline.climbPulled.with { $0.tilt = 7 }
+    /// Wiping the brow: the near hand across the forehead, from its side
+    /// to the other.
+    static let slipWipeIn = rest.with { $0.tilt = -4 }.placingNearest(.armR, at: CGPoint(x: 58, y: 30))
+    static let slipWipeOut = rest.with { $0.tilt = -6 }.placingNearest(.armR, at: CGPoint(x: 44, y: 27))
+    /// The wiping hand moves in a straight line, the elbow staying out.
+    static let slipWipe = LimbPaths(armR: .natural)
 }
 
 /// One played sequence: optional entrance, then the action, ending at rest.
@@ -893,6 +995,10 @@ struct FigureTimeline: Equatable, Sendable {
         case backIn
         /// `in` played backwards: fast start, settling.
         case outCubic
+        /// Accelerating quadratic `u²`: a fall.
+        case quadIn
+        /// `quadIn` played backwards: fast start, settling (a yawn, a kick).
+        case quadOut
 
         /// The same segment played backwards (an exit from an entrance).
         var reversed: Easing {
@@ -903,6 +1009,8 @@ struct FigureTimeline: Equatable, Sendable {
             case .backIn: .out
             case .in: .outCubic
             case .outCubic: .in
+            case .quadIn: .quadOut
+            case .quadOut: .quadIn
             }
         }
     }
@@ -965,6 +1073,10 @@ struct FigureTimeline: Equatable, Sendable {
     /// When the champagne goes off (a burst at each, a cork at the first),
     /// seconds from the start, inside `sprayWindow`; empty = never.
     let sprayBursts: [Double]
+    /// While the nap sleeps, seconds from the start: Z glyphs rise beside
+    /// the head (`SnoozeZs`), fading out for `SnoozeZs.fadeOut` after it;
+    /// nil = it never does.
+    let snoozeWindow: ClosedRange<Double>?
 
     /// How far below the rig's own ground line (grid y 84) the card's edge
     /// sits for the peeking figure (`FigureSkeleton.edgeY`): poses "behind
@@ -1046,6 +1158,7 @@ struct FigureTimeline: Equatable, Sendable {
         var signature: Double?
         var spray: ClosedRange<Double>?
         var bursts: [Double] = []
+        var snooze: ClosedRange<Double>?
 
         if reduceMotion {
             frames.append(Keyframe(time: 0, joints: rest, easing: .inOut))
@@ -1060,6 +1173,7 @@ struct FigureTimeline: Equatable, Sendable {
             holdTime = nil
             sprayWindow = nil
             sprayBursts = []
+            snoozeWindow = nil
             return
         }
 
@@ -1344,6 +1458,61 @@ struct FigureTimeline: Equatable, Sendable {
             hit(poses.flexDoubleBiceps)
             at(0.2, down(), limbs: poses.celebratePlant)
             at(0.3, rest, limbs: poses.celebratePlant)
+        case .nap:
+            // A big yawn (the head rolling back and over), down to kneel the
+            // worm's way, then onto its side along the edge. Asleep, it
+            // breathes slowly while Z glyphs rise; startles awake, kneels,
+            // stands up and shakes the head.
+            at(0.45, poses.napYawn, .quadOut)
+            at(0.5, poses.napYawn.with { $0.tilt = -6 })
+            at(0.4, rest)
+            at(0.45, poses.wormKneel, limbs: poses.wormStepBack)
+            at(0.55, poses.napAsleep, limbs: poses.napHands)
+            let asleep = time
+            for round in 0..<repeats {
+                at(1.1, poses.napInhale, limbs: .hands)
+                at(1.3, poses.napExhale, limbs: .hands)
+                if round == 0 { signature = time }
+            }
+            snooze = asleep...time
+            at(0.09, poses.napStartle, .quadOut, limbs: .hands)
+            at(0.4, poses.napStartle)
+            at(0.45, poses.wormKneel, limbs: poses.napHands)
+            at(0.45, rest, limbs: poses.wormStepBack)
+            at(0.15, rest.with { $0.tilt = 9 })
+            at(0.15, rest.with { $0.tilt = -9 })
+            at(0.18, rest)
+        case .slip:
+            // A step, the foot shoots forward and it falls back behind the
+            // card; the hands catch the edge (a sag, a rebound) and it
+            // turns to the front while hidden. A dip, a pull-up and a look
+            // around over the edge, then up like the climb's entrance; a
+            // moment, and a wipe of the brow.
+            at(0.32, poses.slipStep)
+            at(0.08, poses.slipStep)
+            at(0.13, poses.slipKick, .quadOut)
+            at(0.12, poses.slipTip)
+            at(0.2, poses.slipCaught, .quadIn)
+            at(0.09, poses.slipSag, .quadOut)
+            at(0.16, poses.slipCaught)
+            at(0.35, Self.climbHang)
+            at(0.3, Self.climbHang)
+            at(0.12, poses.slipDip)
+            at(0.38, Self.climbPulled)
+            at(0.15, Self.climbPulled)
+            for round in 0..<repeats {
+                at(0.2, poses.slipLookLeft)
+                if round == 0 { signature = time }
+                at(0.25, poses.slipLookRight)
+            }
+            at(0.18, Self.climbPulled)
+            at(0.3, Self.climbKnee)
+            at(0.26, rest.with { $0.y = -2 }, .out)
+            at(0.14, rest)
+            at(0.25, rest)
+            at(0.28, poses.slipWipeIn, limbs: poses.slipWipe)
+            at(0.22, poses.slipWipeOut, limbs: poses.slipWipe)
+            at(0.35, rest, limbs: poses.slipWipe)
         }
         if let exit = variation.exit {
             hold(variation.holdAfter, stance)
@@ -1367,14 +1536,15 @@ struct FigureTimeline: Equatable, Sendable {
         holdTime = signature
         sprayWindow = spray
         sprayBursts = bursts
+        snoozeWindow = snooze
     }
 
     /// Repetitions of an action's beat at the canvas count (`FigureVariation.repeats` nil).
     static func canvasRepeats(_ action: FigureAction) -> Int {
         switch action {
-        case .rest, .sideStretch, .champagne, .flex: 1
+        case .rest, .sideStretch, .champagne, .flex, .slip: 1
         case .swing, .pullUp, .handstand: 2
-        case .wave, .jumpingJacks, .march, .flag, .climb, .wormWalk, .celebrate: 3
+        case .wave, .jumpingJacks, .march, .flag, .climb, .wormWalk, .celebrate, .nap: 3
         case .run: runCycles
         }
     }
@@ -1480,10 +1650,21 @@ struct FigureTimeline: Equatable, Sendable {
     }
 
     /// Hanging behind the card by the hands: arms straight up, hands just
-    /// just over the edge, the rest of the body hidden.
-    private static let climbHang = FigureJoints.rest.with {
+    /// over the edge, the rest of the body hidden (also the slip's catch).
+    static let climbHang = FigureJoints.rest.with {
         $0.armL = -168; $0.elbowL = 0; $0.armR = 168; $0.elbowR = 0
         $0.legL = -3; $0.legR = 3; $0.y = 63 + behind
+    }
+    /// Pulled up on the edge, elbows out, the head over it.
+    static let climbPulled = climbHang.with {
+        $0.armL = -120; $0.elbowL = 187; $0.armR = 120; $0.elbowR = -187
+        $0.legL = -8; $0.kneeL = 10; $0.legR = 6; $0.kneeR = -6; $0.y = 36 + behind
+    }
+    /// A knee up on the edge, the arms pushing down.
+    static let climbKnee = FigureJoints.rest.with {
+        $0.armL = -40; $0.elbowL = 0; $0.armR = 40; $0.elbowR = 0
+        $0.legL = -105; $0.kneeL = 115; $0.legR = 4; $0.kneeR = 0
+        $0.lean = -4; $0.y = 14 + behind; $0.tilt = -5
     }
 
     /// The climb after `hiddenPose(.climb)`: grab, hang, pull up (elbows out,
@@ -1492,20 +1673,11 @@ struct FigureTimeline: Equatable, Sendable {
     private static let climbSteps: [Step] = {
         let rest = FigureJoints.rest
         let sag = climbHang.with { $0.y = 63.5 + behind; $0.tilt = 4 }
-        let pulled = climbHang.with {
-            $0.armL = -120; $0.elbowL = 187; $0.armR = 120; $0.elbowR = -187
-            $0.legL = -8; $0.kneeL = 10; $0.legR = 6; $0.kneeR = -6; $0.y = 36 + behind
-        }
-        let knee = rest.with {
-            $0.armL = -40; $0.elbowL = 0; $0.armR = 40; $0.elbowR = 0
-            $0.legL = -105; $0.kneeL = 115; $0.legR = 4; $0.kneeR = 0
-            $0.lean = -4; $0.y = 14 + behind; $0.tilt = -5
-        }
         return [
             Step(duration: 0.22, joints: climbHang, easing: .out),
             Step(duration: 0.12, joints: sag),
-            Step(duration: 0.38, joints: pulled),
-            Step(duration: 0.28, joints: knee),
+            Step(duration: 0.38, joints: climbPulled),
+            Step(duration: 0.28, joints: climbKnee),
             Step(duration: 0.26, joints: rest.with { $0.y = -2 }, easing: .out),
             Step(duration: 0.14, joints: rest),
         ]
@@ -1535,8 +1707,19 @@ struct FigureTimeline: Equatable, Sendable {
     /// The shortest still stretch worth stopping the clock for, seconds.
     static let minimumStill = 0.15
 
+    /// Stretches where an effect beside the figure moves on its own, even
+    /// while the pose holds: the champagne's drops (`sprayWindow` and the
+    /// flight after it), the nap's Z glyphs (`snoozeWindow` and their fade).
+    var effectWindows: [ClosedRange<Double>] {
+        [
+            sprayWindow.map { $0.lowerBound...($0.upperBound + ChampagneSpray.tail) },
+            snoozeWindow.map { $0.lowerBound...($0.upperBound + SnoozeZs.fadeOut) },
+        ].compactMap { $0 }
+    }
+
     /// Stretches where nothing moves (the same pose at both ends, no walk,
-    /// no fade), merged when adjacent — the animation clock can stop there.
+    /// no fade, no effect), merged when adjacent: the animation clock can
+    /// stop there.
     var stillWindows: [ClosedRange<Double>] {
         guard !fadesIn else { return [] }
         var windows: [ClosedRange<Double>] = []
@@ -1550,7 +1733,20 @@ struct FigureTimeline: Equatable, Sendable {
                 windows.append(a.time...b.time)
             }
         }
-        return windows.filter { $0.upperBound - $0.lowerBound >= Self.minimumStill }
+        // An effect still moving cuts its part out of a window.
+        let effects = effectWindows
+        let free = windows.flatMap { window in
+            effects.reduce([window]) { parts, effect in
+                parts.flatMap { part -> [ClosedRange<Double>] in
+                    guard effect.lowerBound < part.upperBound, effect.upperBound > part.lowerBound else { return [part] }
+                    var left: [ClosedRange<Double>] = []
+                    if effect.lowerBound > part.lowerBound { left.append(part.lowerBound...effect.lowerBound) }
+                    if effect.upperBound < part.upperBound { left.append(effect.upperBound...part.upperBound) }
+                    return left
+                }
+            }
+        }
+        return free.filter { $0.upperBound - $0.lowerBound >= Self.minimumStill }
     }
 
     /// The pose at `time` seconds from the start (clamped to the ends).
@@ -1585,7 +1781,7 @@ struct FigureTimeline: Equatable, Sendable {
                 x: a.x + (b.x - a.x) * progress + path.lift.dx * arc,
                 y: a.y + (b.y - a.y) * progress + path.lift.dy * arc
             )
-            return pose.placing(limb, at: target, bend: path.bend)
+            return path.nearest ? pose.placingNearest(limb, at: target) : pose.placing(limb, at: target, bend: path.bend)
         }
     }
 
@@ -1609,6 +1805,10 @@ struct FigureTimeline: Equatable, Sendable {
             return 1 - ease(1 - u, .out)
         case .outCubic:
             return 1 - ease(1 - u, .in)
+        case .quadIn:
+            return u * u
+        case .quadOut:
+            return 1 - (1 - u) * (1 - u)
         }
     }
 }
@@ -1764,7 +1964,8 @@ enum FigureRepertoire {
 
     /// Actions on the top edge, opt-in ones included.
     static let top: [FigureAction] = [
-        .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .celebrate, .champagne, .flex,
+        .wave, .jumpingJacks, .sideStretch, .march, .wormWalk, .handstand, .run, .nap, .slip,
+        .celebrate, .champagne, .flex,
     ]
     /// Actions hanging under the bottom edge.
     static let bottom: [FigureAction] = [.swing, .pullUp]
@@ -1793,23 +1994,43 @@ enum FigureRepertoire {
         return all.filter { (FigureTimeline.minimumTravel($0) ?? 0) <= room + 1e-9 }
     }
 
-    /// A random action from `actions`, never `previous` twice in a row
-    /// (unless it is the only one).
+    /// How often `action` is drawn among the others of its edge (1 = as
+    /// often): the nap, by far the longest, a third as often.
+    static func weight(_ action: FigureAction) -> Double {
+        action == .nap ? 1.0 / 3 : 1
+    }
+
+    /// A random action from `actions` by `weight`, never `previous` twice
+    /// in a row (unless it is the only one).
     static func next(
         after previous: FigureAction?, from actions: [FigureAction] = top,
         using generator: inout some RandomNumberGenerator
     ) -> FigureAction {
-        next(after: previous, from: actions, fallback: .rest, using: &generator)
+        next(after: previous, from: actions, fallback: .rest, weight: weight, using: &generator)
     }
 
     /// A random one of `actions` (of any character), never `previous` twice
     /// in a row unless it is the only one; `fallback` when there are none.
+    /// Drawn by `weight` (nil = evenly); evenly weighted it is the same
+    /// draw as without, so seeded picks don't change.
     static func next<Action: Equatable>(
         after previous: Action?, from actions: [Action], fallback: Action,
+        weight: ((Action) -> Double)? = nil,
         using generator: inout some RandomNumberGenerator
     ) -> Action {
         let fresh = actions.filter { $0 != previous }
-        return (fresh.isEmpty ? actions : fresh).randomElement(using: &generator) ?? fallback
+        let pool = fresh.isEmpty ? actions : fresh
+        let weights = weight.map { weight in pool.map { max(weight($0), 0) } } ?? []
+        let total = weights.reduce(0, +)
+        guard total > 0, let first = weights.first, weights.contains(where: { $0 != first }) else {
+            return pool.randomElement(using: &generator) ?? fallback
+        }
+        var roll = Double.random(in: 0..<total, using: &generator)
+        for (action, share) in zip(pool, weights) {
+            roll -= share
+            if roll < 0 { return action }
+        }
+        return pool.last ?? fallback
     }
 }
 

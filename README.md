@@ -14,7 +14,9 @@ somewhere else:
 
 - **top edge** - stands on it: rests, waves, does jumping jacks, stretches,
   marches, inches along it like a caterpillar (worm walk), cartwheels into a
-  handstand or runs along the edge; on a card that asks for it, celebrates like
+  handstand, runs along the edge, takes a nap lying on its side along the edge
+  (Z glyphs rising beside the head), or slips off the edge as on a banana
+  peel, catches it with both hands and climbs back up; on a card that asks for it, celebrates like
   a winner on the podium: hops with both arms up in a V, shakes a bottle of
   champagne until it goes off to each side, or strikes bodybuilder poses (see
   [Actions per anchor](#actions-per-anchor));
@@ -49,7 +51,7 @@ enter the URL, or in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Jojogurt/EdgeBuddy.git", from: "0.7.0"),
+    .package(url: "https://github.com/Jojogurt/EdgeBuddy.git", from: "0.8.0"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: ["EdgeBuddy"]),
@@ -62,7 +64,7 @@ XcodeGen (`project.yml`):
 packages:
   EdgeBuddy:
     url: https://github.com/Jojogurt/EdgeBuddy.git
-    from: 0.7.0
+    from: 0.8.0
 ```
 
 ## Quick start
@@ -143,7 +145,9 @@ there is another), then an edge of it, evenly:
 Weights are renormalized over the edges that are possible right now. Some
 actions need more room: the climb needs ~136 pt of the side on screen (it
 climbs at least ~54 pt, always to the top of the visible side), the worm walk ~33 pt of free width on one side of
-it; elsewhere the edge simply plays its other actions. Sizes scale with
+it; elsewhere the edge simply plays its other actions. The nap lies within the
+figure's own width, so every top it fits on has room for it; it is long (about
+12 s), so it comes up about a third as often as the other actions. Sizes scale with
 `figureHeight(_:)`.
 
 ### Actions per anchor
@@ -333,7 +337,8 @@ once, without the entrance — the steadiest choice for snapshots — and `spot`
 (0…1, default 0.5) to move it along the edge.
 
 `FigurePose` lists the poses with a clear still frame: `.rest` (top and
-bottom), `.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand`, `.celebrate`, `.champagne`, `.flex` (top),
+bottom), `.wave`, `.jumpingJacks`, `.sideStretch`, `.march`, `.handstand`, `.nap` (asleep, a Z beside the head),
+`.slip` (pulled up on the edge, looking over it), `.celebrate`, `.champagne`, `.flex` (top),
 `.swing`, `.pullUp` (bottom), `.flag` (sides). A pose pinned at the top or
 the bottom where it isn't played rests there. A side only plays the flag:
 any other pose pinned at a side (`.rest` included) plays on the top of the

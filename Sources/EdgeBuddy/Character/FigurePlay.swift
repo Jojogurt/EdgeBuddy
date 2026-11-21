@@ -117,6 +117,9 @@ struct FigureActionInfo: Equatable, Sendable {
     var repeatRange: ClosedRange<Int>
     /// Beats when not looping.
     var defaultRepeats: Int
+    /// How often it is drawn among the edge's others (1 = as often;
+    /// `FigureRepertoire.weight`).
+    var weight: Double = 1
 }
 
 enum FigureRest {

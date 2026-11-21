@@ -50,6 +50,12 @@ public struct FigureActionName: RawRepresentable, Hashable, Sendable, Expressibl
     public static let handstand = Self(FigureAction.handstand)
     /// Top: runs along the edge to another spot.
     public static let run = Self(FigureAction.run)
+    /// Top: yawns, lies down on its side along the edge and naps, Z glyphs
+    /// rising, then startles awake and gets up. Long, so drawn less often.
+    public static let nap = Self(FigureAction.nap)
+    /// Top: slips as on a banana peel, falls behind the card, catches the
+    /// edge with both hands, looks around and climbs back up.
+    public static let slip = Self(FigureAction.slip)
     /// Top: a winner on the podium, hops with both arms up in a V. Opt-in:
     /// played only on anchors that list it.
     public static let celebrate = Self(FigureAction.celebrate)
